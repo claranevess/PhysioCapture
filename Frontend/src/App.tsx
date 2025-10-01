@@ -11,6 +11,11 @@ import PatientRecord from "./pages/PatientRecord";
 import Activities from "./pages/Activities";
 import Profile from "./pages/Profile";
 import NotFound from "./pages/NotFound";
+import DocumentDigitization from "./pages/DocumentDigitization";
+import MedicalRecord from "./pages/MedicalRecord";
+import DevicesPage from "./pages/DevicesPage";
+import AnalyticsPage from "./pages/AnalyticsPage";
+import MobilePage from "./pages/MobilePage";
 
 const queryClient = new QueryClient();
 
@@ -28,7 +33,12 @@ const App = () => (
           <Route path="/patients/new" element={<PatientForm />} />
           <Route path="/patients/:id" element={<PatientRecord />} />
           <Route path="/patients/:id/edit" element={<PatientForm />} />
+          <Route path="/patients/:id/record" element={<MedicalRecord />} />
           <Route path="/activities" element={<Activities />} />
+          <Route path="/documents" element={<DocumentDigitization />} />
+          <Route path="/devices" element={<DevicesPage />} />
+          <Route path="/analytics" element={<AnalyticsPage />} />
+          <Route path="/mobile" element={<MobilePage />} />
           <Route path="/profile" element={<Profile />} />
           <Route path="*" element={<NotFound />} />
         </Routes>

@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ArrowLeft, Save, Camera, Smartphone, Mic, Upload, Zap, AlertCircle, CheckCircle, Clock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
-export default function PatientForm() {
+export default function PatientFormNew() {
   const navigate = useNavigate();
   const { id } = useParams();
   const { toast } = useToast();
@@ -23,10 +23,22 @@ export default function PatientForm() {
     birthDate: "",
     phone: "",
     email: "",
+    address: "",
+    city: "",
+    state: "",
+    zipCode: "",
+    emergencyContact: "",
+    emergencyPhone: "",
+    allergies: "",
+    conditions: "",
+    medications: "",
+    // Novos campos PhysioCapture
     mainCondition: "",
     painLevel: "5",
     mobilityLevel: "3",
     treatmentGoals: "",
+    previousTreatments: "",
+    devicePreference: "",
     enableSmartwatch: false,
     enableTranscription: false,
     enablePhotoCapture: false,
@@ -34,8 +46,8 @@ export default function PatientForm() {
   });
 
   const [uploadStatus, setUploadStatus] = useState({
-    ficha: "pending",
-    device: "pending", 
+    ficha: "pending", // pending, uploading, success, error
+    device: "pending",
     photo: "pending"
   });
 
@@ -49,6 +61,64 @@ export default function PatientForm() {
 
   const handleSelectChange = (name: string, value: string) => {
     setFormData({ ...formData, [name]: value });
+  };
+
+  const handlePhotoCapture = () => {
+    setUploadStatus(prev => ({ ...prev, photo: "uploading" }));
+    // Simular upload de foto
+    setTimeout(() => {
+      setUploadStatus(prev => ({ ...prev, photo: "success" }));
+      toast({
+        title: "Foto capturada!",
+        description: "Foto do paciente salva com sucesso.",
+      });
+    }, 2000);
+  };
+
+  const handleFichaDigitalizacao = () => {
+    setUploadStatus(prev => ({ ...prev, ficha: "uploading" }));
+    // Simular digitalização
+    setTimeout(() => {
+      setUploadStatus(prev => ({ ...prev, ficha: "success" }));
+      // Auto-preenchimento simulado
+      setFormData(prev => ({
+        ...prev,
+        name: "Maria Silva (Auto-detectado)",
+        cpf: "123.456.789-00",
+        mainCondition: "Dor lombar crônica",
+        painLevel: "7",
+        mobilityLevel: "2"
+      }));
+      toast({
+        title: "Ficha digitalizada com sucesso!",
+        description: "Dados extraídos automaticamente e campos preenchidos.",
+      });
+    }, 3000);
+  };
+
+  const handleDeviceConnection = () => {
+    setUploadStatus(prev => ({ ...prev, device: "uploading" }));
+    // Simular conexão com dispositivo
+    setTimeout(() => {
+      setUploadStatus(prev => ({ ...prev, device: "success" }));
+      toast({
+        title: "Dispositivo conectado!",
+        description: "Apple Watch conectado para coleta automática de dados.",
+      });
+    }, 2000);
+  };
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case "uploading":
+        return <Clock className="h-4 w-4 text-blue-600 animate-spin" />;
+      case "success":
+        return <CheckCircle className="h-4 w-4 text-green-600" />;
+      case "error":
+        return <AlertCircle className="h-4 w-4 text-red-600" />;
+      default:
+        return null;
+    }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -72,7 +142,7 @@ export default function PatientForm() {
 
   return (
     <Layout>
-      <div className="space-y-6 max-w-4xl animate-in fade-in slide-in-from-bottom-4 duration-700">
+      <div className="space-y-6 max-w-6xl animate-in fade-in slide-in-from-bottom-4 duration-700">
         <div className="flex items-center gap-4">
           <Button
             variant="ghost"
@@ -90,6 +160,84 @@ export default function PatientForm() {
               Use nossa tecnologia para capturar dados automaticamente
             </p>
           </div>
+        </div>
+
+        {/* Ferramentas PhysioCapture */}
+        <div className="grid gap-4 md:grid-cols-3">
+          <Card className="border-2 border-blue-200 bg-blue-50 hover-lift cursor-pointer" onClick={handleFichaDigitalizacao}>
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-blue-600 rounded-lg">
+                    <Camera className="h-5 w-5 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-blue-800">Digitalizar Ficha</h3>
+                    <p className="text-sm text-blue-600">Fotografe e extraia dados</p>
+                  </div>
+                </div>
+                {getStatusIcon(uploadStatus.ficha)}
+              </div>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="w-full bg-white border-blue-300 text-blue-700 hover:bg-blue-100"
+                disabled={uploadStatus.ficha === "uploading"}
+              >
+                {uploadStatus.ficha === "uploading" ? "Digitalizando..." : "Iniciar Digitalização"}
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card className="border-2 border-green-200 bg-green-50 hover-lift cursor-pointer" onClick={handleDeviceConnection}>
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-green-600 rounded-lg">
+                    <Smartphone className="h-5 w-5 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-green-800">Conectar Dispositivo</h3>
+                    <p className="text-sm text-green-600">Smartwatch ou sensor</p>
+                  </div>
+                </div>
+                {getStatusIcon(uploadStatus.device)}
+              </div>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="w-full bg-white border-green-300 text-green-700 hover:bg-green-100"
+                disabled={uploadStatus.device === "uploading"}
+              >
+                {uploadStatus.device === "uploading" ? "Conectando..." : "Conectar Agora"}
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card className="border-2 border-purple-200 bg-purple-50 hover-lift cursor-pointer" onClick={handlePhotoCapture}>
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-purple-600 rounded-lg">
+                    <Upload className="h-5 w-5 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-purple-800">Foto do Paciente</h3>
+                    <p className="text-sm text-purple-600">Capturar imagem</p>
+                  </div>
+                </div>
+                {getStatusIcon(uploadStatus.photo)}
+              </div>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="w-full bg-white border-purple-300 text-purple-700 hover:bg-purple-100"
+                disabled={uploadStatus.photo === "uploading"}
+              >
+                {uploadStatus.photo === "uploading" ? "Capturando..." : "Tirar Foto"}
+              </Button>
+            </CardContent>
+          </Card>
         </div>
 
         <form onSubmit={handleSubmit}>
@@ -172,7 +320,7 @@ export default function PatientForm() {
               </CardContent>
             </Card>
 
-            {/* Informações Clínicas */}
+            {/* Informações Clínicas PhysioCapture */}
             <Card className="border-2 border-primary/20 bg-gradient-to-br from-primary/5 to-transparent">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -242,7 +390,7 @@ export default function PatientForm() {
               </CardContent>
             </Card>
 
-            {/* Configurações */}
+            {/* Configurações PhysioCapture */}
             <Card className="border-2 border-green-200 bg-green-50">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -297,7 +445,7 @@ export default function PatientForm() {
               </CardContent>
             </Card>
 
-            {/* Consentimento */}
+            {/* Termos e Consentimento */}
             <Card className="border-2 border-amber-200 bg-amber-50">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -318,14 +466,14 @@ export default function PatientForm() {
                       Concordo com os termos de uso do PhysioCapture *
                     </Label>
                     <p className="text-sm text-muted-foreground mt-1">
-                      Autorizo a coleta, processamento e armazenamento de dados de saúde pelo sistema PhysioCapture.
+                      Autorizo a coleta, processamento e armazenamento de dados de saúde pelo sistema PhysioCapture para fins de tratamento médico. Os dados serão tratados com confidencialidade e segurança máxima, seguindo a LGPD.
                     </p>
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            {/* Botões */}
+            {/* Botões de Ação */}
             <div className="flex gap-4 pt-6">
               <Button
                 type="button"

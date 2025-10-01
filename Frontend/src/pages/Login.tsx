@@ -31,7 +31,7 @@ export default function Login() {
           <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-primary rounded-2xl mb-6 shadow-2xl animate-float">
             <Activity className="h-10 w-10 text-white" />
           </div>
-          <h1 className="text-5xl font-bold bg-gradient-primary bg-clip-text text-transparent mb-3 tracking-tight">
+          <h1 className="text-5xl font-bold gradient-text mb-3 tracking-tight">
             PhysioCapture
           </h1>
           <p className="text-muted-foreground text-lg">Transformando dados de fisioterapia</p>
