@@ -1,0 +1,178 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+// Usuário (Fisioterapeuta)
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  password      String    // Hash bcrypt
+  name          String
+  crm           String?   // Registro no conselho
+  
+  // Relacionamentos
+  patients      Patient[]
+  consultations Consultation[]
+  documents     Document[]
+  
+  // Auditoria
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  @@map("users")
+}
+
+// Paciente
+model Patient {
+  id                  String    @id @default(cuid())
+  
+  // Dados pessoais
+  fullName            String
+  cpf                 String    @unique
+  dateOfBirth         DateTime
+  age                 Int       // Calculado automaticamente
+  phone               String
+  phoneSecondary      String?
+  email               String?
+  
+  // Endereço
+  zipCode             String?
+  street              String?
+  number              String?
+  complement          String?
+  neighborhood        String?
+  city                String?
+  state               String?
+  
+  // Profissional/Convênio
+  occupation          String?
+  insurance           String?
+  insuranceNumber     String?
+  
+  // Status
+  status              PatientStatus @default(ACTIVE)
+  
+  // Observações gerais
+  generalNotes        String?
+  
+  // Anamnese
+  chiefComplaint      String?
+  currentIllness      String?
+  medicalHistory      String?
+  medications         String?
+  allergies           String?
+  lifestyle           String?
+  physicalAssessment  String?
+  
+  // Relacionamentos
+  userId              String    // Fisioterapeuta responsável
+  user                User      @relation(fields: [userId], references: [id])
+  consultations       Consultation[]
+  documents           Document[]
+  
+  // Auditoria
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  lastVisitDate       DateTime?
+  
+  @@index([userId])
+  @@index([cpf])
+  @@index([fullName])
+  @@index([status])
+  @@map("patients")
+}
+
+// Consulta/Evolução
+model Consultation {
+  id                  String   @id @default(cuid())
+  
+  date                DateTime @default(now())
+  type                ConsultationType
+  
+  // SOAP (Subjetivo, Objetivo, Avaliação, Plano)
+  subjective          String? // Queixas do paciente
+  objective           String? // Avaliação objetiva/exame físico
+  assessment          String? // Avaliação/impressão clínica
+  plan                String? // Conduta/tratamento
+  
+  exercises           String? // Exercícios prescritos
+  nextVisit           DateTime? // Próxima consulta sugerida
+  notes               String? // Observações gerais
+  
+  // Relacionamentos
+  patientId           String
+  patient             Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  
+  performedBy         String   // ID do fisioterapeuta
+  performer           User     @relation(fields: [performedBy], references: [id])
+  
+  // Auditoria
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  canEdit             Boolean  @default(true) // Apenas 24h após criação
+  
+  @@index([patientId])
+  @@index([date])
+  @@map("consultations")
+}
+
+// Documento
+model Document {
+  id          String   @id @default(cuid())
+  fileName    String   // Nome original do arquivo
+  fileUrl     String   // URL do arquivo no storage
+  fileSize    Int      // Tamanho em bytes
+  mimeType    String   // image/jpeg, application/pdf, etc
+  category    DocumentCategory
+  title       String?  // Título customizado
+  description String?  // Notas/descrição
+  
+  patientId   String
+  patient     Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  
+  uploadedBy  String   // ID do usuário que fez upload
+  uploader    User     @relation(fields: [uploadedBy], references: [id])
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@index([patientId])
+  @@index([category])
+  @@index([createdAt])
+  @@map("documents")
+}
+
+// Enums
+enum PatientStatus {
+  ACTIVE              // Em tratamento
+  INACTIVE            // Inativo
+  EVALUATION          // Em avaliação
+  DISCHARGED          // Alta
+}
+
+enum ConsultationType {
+  INITIAL_EVALUATION  // Avaliação inicial
+  REASSESSMENT        // Reavaliação
+  TREATMENT_SESSION   // Sessão de tratamento
+  DISCHARGE           // Alta
+  RETURN              // Retorno
+}
+
+enum DocumentCategory {
+  EXAME_IMAGEM
+  EXAME_LABORATORIAL
+  RECEITA
+  ATESTADO
+  CONSENTIMENTO
+  ANAMNESE
+  RELATORIO_EVOLUCAO
+  OUTROS
+}
