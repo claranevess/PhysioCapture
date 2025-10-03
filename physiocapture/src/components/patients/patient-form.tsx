@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { TherapistSelect } from './therapist-select'
 import { Loader2 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
@@ -28,6 +29,11 @@ export function PatientForm({ initialData, isEditing = false, patientId }: Patie
   const [isCEPLoading, setIsCEPLoading] = useState(false)
   const router = useRouter()
 
+  // Converter null para string vazia em campos opcionais
+  const processedInitialData = initialData ? Object.fromEntries(
+    Object.entries(initialData).map(([key, value]) => [key, value === null ? '' : value])
+  ) as Partial<PatientFormData> : undefined
+
   const {
     register,
     handleSubmit,
@@ -38,20 +44,27 @@ export function PatientForm({ initialData, isEditing = false, patientId }: Patie
     clearErrors,
   } = useForm<PatientFormData>({
     resolver: zodResolver(patientSchema),
-    defaultValues: initialData,
+    defaultValues: processedInitialData,
   })
 
   const watchedCPF = watch('cpf')
   const watchedZipCode = watch('zipCode')
+  const watchedTherapist = watch('assignedTherapistId')
 
   // Buscar CEP automaticamente
   const handleCEPBlur = async (cep: string) => {
-    if (!cep || cep.length !== 9) return
+    if (!cep || cep.length < 8) return
 
     // Validar formato antes de buscar
     const cleanCEP = cep.replace(/\D/g, '')
     if (cleanCEP.length !== 8) {
-      toast.error('CEP deve ter 8 dígitos')
+      toast.error('CEP deve ter 8 dígitos', { id: 'cep-search' })
+      return
+    }
+
+    // Validar se não é CEP sequencial
+    if (/^(\d)\1{7}$/.test(cleanCEP)) {
+      toast.error('CEP inválido. Digite um CEP válido.', { id: 'cep-search' })
       return
     }
 
@@ -72,22 +85,31 @@ export function PatientForm({ initialData, isEditing = false, patientId }: Patie
       
       // Se algum campo não foi preenchido, avisar o usuário
       if (!address.street && !address.neighborhood) {
-        toast.warning('CEP encontrado, mas alguns campos podem precisar ser preenchidos manualmente')
+        toast.info('CEP encontrado, mas preencha os campos manualmente.', { id: 'cep-info' })
       }
       
     } catch (error) {
       console.error('Erro ao buscar CEP:', error)
       
-      const errorMessage = error instanceof Error ? error.message : 'Erro ao buscar endereço pelo CEP'
+      // Mensagens de erro mais amigáveis
+      let errorMessage = 'Erro ao buscar endereço pelo CEP'
+      
+      if (error instanceof Error) {
+        if (error.message.includes('não encontrado')) {
+          errorMessage = 'CEP não encontrado. Verifique e tente novamente, ou preencha manualmente.'
+        } else if (error.message.includes('conexão') || error.message.includes('rede')) {
+          errorMessage = 'Erro de conexão. Verifique sua internet ou preencha manualmente.'
+        } else if (error.message.includes('timeout') || error.message.includes('Tempo limite')) {
+          errorMessage = 'Tempo esgotado. Tente novamente ou preencha manualmente.'
+        } else {
+          errorMessage = error.message
+        }
+      }
+      
       toast.error(errorMessage, { id: 'cep-search' })
       
-      // Se o erro foi de CEP não encontrado, limpar os campos relacionados
-      if (error instanceof Error && error.message.includes('não encontrado')) {
-        setValue('street', '')
-        setValue('neighborhood', '')
-        setValue('city', '')
-        setValue('state', '')
-      }
+      // Não limpar os campos - deixar o usuário preencher manualmente
+      
     } finally {
       setIsCEPLoading(false)
     }
@@ -362,6 +384,25 @@ export function PatientForm({ initialData, isEditing = false, patientId }: Patie
         </CardContent>
       </Card>
 
+      {/* Atribuição de Fisioterapeuta */}
+      <Card className="border-l-4 border-l-green-500">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            Fisioterapeuta Responsável
+            <span className="text-sm font-normal text-muted-foreground">
+              (Opcional)
+            </span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <TherapistSelect
+            value={watchedTherapist}
+            onChange={(value) => setValue('assignedTherapistId', value)}
+            disabled={loading}
+          />
+        </CardContent>
+      </Card>
+
       {/* Endereço */}
       <Card className="border-l-4 border-l-gray-300">
         <CardHeader>
@@ -396,8 +437,12 @@ export function PatientForm({ initialData, isEditing = false, patientId }: Patie
                   </div>
                 )}
               </div>
-              {errors.zipCode && (
+              {errors.zipCode ? (
                 <p className="text-sm text-destructive mt-1">{errors.zipCode.message}</p>
+              ) : (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Digite o CEP para preencher automaticamente o endereço
+                </p>
               )}
             </div>
 

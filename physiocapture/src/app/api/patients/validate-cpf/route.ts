@@ -23,7 +23,7 @@ export async function POST(request: Request) {
 
     const where: any = {
       cpf: cleanCPF,
-      userId: session.user.id, // Apenas do usuário logado
+      clinicId: session.user.clinicId, // Verificar apenas na mesma clínica
     }
 
     if (excludeId) {

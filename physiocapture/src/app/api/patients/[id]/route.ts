@@ -19,19 +19,51 @@ export async function GET(
 
     const { id } = await params
 
+    // Construir where baseado na clínica e role
+    const where: any = {
+      id,
+      clinicId: session.user.clinicId, // Sempre da mesma clínica
+    }
+
+    // Fisioterapeutas veem apenas seus pacientes
+    if (session.user.role === 'PHYSIOTHERAPIST') {
+      where.assignedTherapistId = session.user.id
+    }
+
     const patient = await db.patient.findFirst({
-      where: {
-        id,
-        userId: session.user.id, // Apenas pacientes do usuário logado
-      },
+      where,
       include: {
+        assignedTherapist: {
+          select: {
+            id: true,
+            name: true,
+            crm: true,
+          },
+        },
         consultations: {
           orderBy: { date: 'desc' },
-          take: 10, // Últimas 10 consultas
+          take: 10,
+          include: {
+            performer: {
+              select: {
+                id: true,
+                name: true,
+                crm: true,
+              },
+            },
+          },
         },
         documents: {
           orderBy: { createdAt: 'desc' },
-          take: 10, // Últimos 10 documentos
+          take: 10,
+          include: {
+            uploader: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+          },
         },
         _count: {
           select: {
@@ -81,18 +113,26 @@ export async function PATCH(
     const { id } = await params
     console.log('Patient ID:', id)
 
-    // Verificar se o paciente pertence ao usuário
+    // Construir where baseado na clínica e role
+    const where: any = {
+      id,
+      clinicId: session.user.clinicId,
+    }
+
+    // Fisioterapeutas só podem editar seus pacientes
+    if (session.user.role === 'PHYSIOTHERAPIST') {
+      where.assignedTherapistId = session.user.id
+    }
+
+    // Verificar se o paciente pertence à clínica e se usuário tem permissão
     const existingPatient = await db.patient.findFirst({
-      where: {
-        id,
-        userId: session.user.id,
-      },
+      where,
     })
 
     if (!existingPatient) {
-      console.log('Paciente não encontrado para o usuário')
+      console.log('Paciente não encontrado ou sem permissão')
       return NextResponse.json(
-        { error: 'Paciente não encontrado' },
+        { error: 'Paciente não encontrado ou você não tem permissão para editá-lo' },
         { status: 404 }
       )
     }
@@ -184,17 +224,33 @@ export async function DELETE(
 
     const { id } = await params
 
-    // Verificar se o paciente pertence ao usuário
+    // Construir where - Admin e Manager podem deletar qualquer paciente da clínica
+    const where: any = {
+      id,
+      clinicId: session.user.clinicId,
+    }
+
+    // Fisioterapeutas só podem deletar seus próprios pacientes
+    if (session.user.role === 'PHYSIOTHERAPIST') {
+      where.assignedTherapistId = session.user.id
+    }
+
+    // Recepcionista não pode deletar pacientes
+    if (session.user.role === 'RECEPTIONIST') {
+      return NextResponse.json(
+        { error: 'Você não tem permissão para excluir pacientes' },
+        { status: 403 }
+      )
+    }
+
+    // Verificar se o paciente existe e se usuário tem permissão
     const existingPatient = await db.patient.findFirst({
-      where: {
-        id,
-        userId: session.user.id,
-      },
+      where,
     })
 
     if (!existingPatient) {
       return NextResponse.json(
-        { error: 'Paciente não encontrado' },
+        { error: 'Paciente não encontrado ou você não tem permissão para excluí-lo' },
         { status: 404 }
       )
     }

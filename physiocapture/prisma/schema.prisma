@@ -10,23 +10,89 @@ datasource db {
   url      = "file:./dev.db"
 }
 
-// Usuário (Fisioterapeuta)
+// Clínica (Cliente Principal do Sistema)
+model Clinic {
+  id                String    @id @default(cuid())
+  
+  // Dados da clínica
+  name              String
+  cnpj              String    @unique
+  email             String    @unique
+  phone             String
+  phoneSecondary    String?
+  
+  // Endereço
+  zipCode           String
+  street            String
+  number            String
+  complement        String?
+  neighborhood      String
+  city              String
+  state             String
+  
+  // Plano/Assinatura
+  plan              ClinicPlan  @default(BASIC)
+  planStatus        PlanStatus  @default(TRIAL)
+  maxUsers          Int         @default(5)     // Limite de usuários conforme plano
+  maxPatients       Int         @default(100)   // Limite de pacientes conforme plano
+  maxStorage        Int         @default(5)     // GB de armazenamento
+  
+  // Informações administrativas
+  logo              String?     // URL do logo
+  website           String?
+  description       String?
+  
+  // Relacionamentos
+  users             User[]
+  patients          Patient[]
+  documents         Document[]
+  consultations     Consultation[]
+  
+  // Auditoria
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  subscriptionDate  DateTime  @default(now())
+  expirationDate    DateTime? // Data de expiração do plano
+  isActive          Boolean   @default(true)
+  
+  @@index([cnpj])
+  @@index([isActive])
+  @@map("clinics")
+}
+
+// Usuário (Profissionais da Clínica)
 model User {
   id            String    @id @default(cuid())
   email         String    @unique
   password      String    // Hash bcrypt
   name          String
-  crm           String?   // Registro no conselho
+  role          UserRole  @default(PHYSIOTHERAPIST)
+  
+  // Dados profissionais
+  crm           String?   // Registro no conselho (para fisioterapeutas)
+  cpf           String?   @unique
+  phone         String?
+  
+  // Vínculo com a clínica
+  clinicId      String
+  clinic        Clinic    @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  
+  // Status
+  isActive      Boolean   @default(true)
   
   // Relacionamentos
-  patients      Patient[]
-  consultations Consultation[]
-  documents     Document[]
+  assignedPatients   Patient[]     @relation("AssignedTherapist")
+  consultations      Consultation[]
+  documentsUploaded  Document[]
   
   // Auditoria
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
+  lastLoginAt   DateTime?
   
+  @@index([clinicId])
+  @@index([email])
+  @@index([role])
   @@map("users")
 }
 
@@ -72,9 +138,15 @@ model Patient {
   lifestyle           String?
   physicalAssessment  String?
   
+  // Vínculo com a clínica
+  clinicId            String
+  clinic              Clinic    @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  
+  // Fisioterapeuta responsável
+  assignedTherapistId String?
+  assignedTherapist   User?     @relation("AssignedTherapist", fields: [assignedTherapistId], references: [id])
+  
   // Relacionamentos
-  userId              String    // Fisioterapeuta responsável
-  user                User      @relation(fields: [userId], references: [id])
   consultations       Consultation[]
   documents           Document[]
   
@@ -83,7 +155,8 @@ model Patient {
   updatedAt           DateTime  @updatedAt
   lastVisitDate       DateTime?
   
-  @@index([userId])
+  @@index([clinicId])
+  @@index([assignedTherapistId])
   @@index([cpf])
   @@index([fullName])
   @@index([status])
@@ -107,11 +180,15 @@ model Consultation {
   nextVisit           DateTime? // Próxima consulta sugerida
   notes               String? // Observações gerais
   
+  // Vínculo com a clínica
+  clinicId            String
+  clinic              Clinic   @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  
   // Relacionamentos
   patientId           String
   patient             Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
   
-  performedBy         String   // ID do fisioterapeuta
+  performedBy         String   // ID do fisioterapeuta que realizou
   performer           User     @relation(fields: [performedBy], references: [id])
   
   // Auditoria
@@ -119,7 +196,9 @@ model Consultation {
   updatedAt           DateTime @updatedAt
   canEdit             Boolean  @default(true) // Apenas 24h após criação
   
+  @@index([clinicId])
   @@index([patientId])
+  @@index([performedBy])
   @@index([date])
   @@map("consultations")
 }
@@ -135,6 +214,10 @@ model Document {
   title       String?  // Título customizado
   description String?  // Notas/descrição
   
+  // Vínculo com a clínica
+  clinicId    String
+  clinic      Clinic   @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  
   patientId   String
   patient     Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
   
@@ -144,6 +227,7 @@ model Document {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   
+  @@index([clinicId])
   @@index([patientId])
   @@index([category])
   @@index([createdAt])
@@ -151,6 +235,26 @@ model Document {
 }
 
 // Enums
+enum UserRole {
+  ADMIN               // Administrador da clínica (acesso total)
+  MANAGER             // Gestor (relatórios, configurações)
+  PHYSIOTHERAPIST     // Fisioterapeuta (atendimento)
+  RECEPTIONIST        // Recepcionista (cadastros, agendamento)
+}
+
+enum ClinicPlan {
+  BASIC               // Plano Básico
+  PROFESSIONAL        // Plano Profissional
+  ENTERPRISE          // Plano Enterprise
+}
+
+enum PlanStatus {
+  TRIAL               // Período de teste
+  ACTIVE              // Ativo
+  SUSPENDED           // Suspenso (pagamento pendente)
+  CANCELLED           // Cancelado
+}
+
 enum PatientStatus {
   ACTIVE              // Em tratamento
   INACTIVE            // Inativo

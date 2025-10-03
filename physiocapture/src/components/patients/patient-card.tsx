@@ -126,6 +126,13 @@ export function PatientCard({ patient, onEdit, onDelete }: PatientCardProps) {
             </div>
           )}
 
+          {patient.assignedTherapist && (
+            <div className="flex items-center text-green-600">
+              <Stethoscope className="h-4 w-4 mr-2" />
+              Fisio: {patient.assignedTherapist.name}
+            </div>
+          )}
+
           {lastConsultation && (
             <div className="flex items-center text-muted-foreground">
               <Calendar className="h-4 w-4 mr-2" />

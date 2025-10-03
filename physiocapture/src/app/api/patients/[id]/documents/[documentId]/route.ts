@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { db as prisma } from '@/lib/db'
 import { deleteFileLocally } from '@/lib/local-storage'
+import { canViewAllPatients } from '@/lib/permissions'
 
 export async function DELETE(
   request: NextRequest,
@@ -12,23 +13,28 @@ export async function DELETE(
     const { id: patientId, documentId } = await params
     const session = await getServerSession(authOptions)
 
-    if (!session?.user?.id) {
+    if (!session?.user?.clinicId || !session?.user?.role) {
       return NextResponse.json(
         { error: 'Usuário não autenticado' },
         { status: 401 }
       )
     }
 
-    // Buscar documento
-    const document = await prisma.document.findFirst({
-      where: {
-        id: documentId,
-        patientId,
-        patient: {
-          userId: session.user.id,
-        },
+    // Buscar documento e verificar permissões
+    const where: any = {
+      id: documentId,
+      patientId,
+      patient: {
+        clinicId: session.user.clinicId,
       },
-    })
+    }
+
+    // Fisioterapeutas só acessam documentos de seus pacientes
+    if (!canViewAllPatients(session.user.role as any)) {
+      where.patient.assignedTherapistId = session.user.id
+    }
+
+    const document = await prisma.document.findFirst({ where })
 
     if (!document) {
       return NextResponse.json(
@@ -75,23 +81,28 @@ export async function GET(
     const { id: patientId, documentId } = await params
     const session = await getServerSession(authOptions)
 
-    if (!session?.user?.id) {
+    if (!session?.user?.clinicId || !session?.user?.role) {
       return NextResponse.json(
         { error: 'Usuário não autenticado' },
         { status: 401 }
       )
     }
 
-    // Buscar documento
-    const document = await prisma.document.findFirst({
-      where: {
-        id: documentId,
-        patientId,
-        patient: {
-          userId: session.user.id,
-        },
+    // Buscar documento e verificar permissões
+    const where: any = {
+      id: documentId,
+      patientId,
+      patient: {
+        clinicId: session.user.clinicId,
       },
-    })
+    }
+
+    // Fisioterapeutas só acessam documentos de seus pacientes
+    if (!canViewAllPatients(session.user.role as any)) {
+      where.patient.assignedTherapistId = session.user.id
+    }
+
+    const document = await prisma.document.findFirst({ where })
 
     if (!document) {
       return NextResponse.json(

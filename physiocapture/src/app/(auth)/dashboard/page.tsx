@@ -7,8 +7,14 @@ import { StatusBadge } from '@/components/ui/badge-new'
 import { Users, FileText, Stethoscope, Plus, Activity, Calendar, TrendingUp, Upload } from 'lucide-react'
 import Link from 'next/link'
 
-async function getDashboardData(userId: string) {
+async function getDashboardData(userId: string, clinicId: string, userRole: string) {
   try {
+    // Construir where baseado na role
+    const patientWhere: any = { clinicId }
+    if (userRole === 'PHYSIOTHERAPIST') {
+      patientWhere.assignedTherapistId = userId
+    }
+
     const [
       totalPatients,
       activePatients,
@@ -18,23 +24,19 @@ async function getDashboardData(userId: string) {
       recentConsultations,
     ] = await Promise.all([
       db.patient.count({ 
-        where: { userId }
+        where: patientWhere
       }),
       db.patient.count({ 
-        where: { userId, status: 'ACTIVE' }
+        where: { ...patientWhere, status: 'ACTIVE' }
       }),
       db.consultation.count({ 
-        where: { 
-          patient: { userId } 
-        }
+        where: { clinicId }
       }),
       db.document.count({ 
-        where: { 
-          patient: { userId } 
-        }
+        where: { clinicId }
       }),
       db.patient.findMany({
-        where: { userId },
+        where: patientWhere,
         orderBy: { createdAt: 'desc' },
         take: 3,
         select: {
@@ -44,9 +46,7 @@ async function getDashboardData(userId: string) {
         },
       }),
       db.consultation.findMany({
-        where: { 
-          patient: { userId } 
-        },
+        where: { clinicId },
         orderBy: { date: 'desc' },
         take: 3,
         select: {
@@ -90,7 +90,11 @@ export default async function DashboardPage() {
     return null
   }
 
-  const data = await getDashboardData(session.user.id)
+  const data = await getDashboardData(
+    session.user.id, 
+    session.user.clinicId,
+    session.user.role
+  )
 
   return (
     <div className="space-y-8 animate-fade-in">

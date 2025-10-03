@@ -52,45 +52,48 @@ export const patientSchema = z.object({
   phoneSecondary: z
     .string()
     .regex(/^\(\d{2}\) \d{4,5}-\d{4}$/, 'Telefone inválido')
-    .optional()
-    .or(z.literal('')),
+    .or(z.literal(''))
+    .optional(),
     
   email: z
     .string()
     .email('Email inválido')
-    .optional()
-    .or(z.literal('')),
+    .or(z.literal(''))
+    .optional(),
     
   zipCode: z
     .string()
     .regex(/^\d{5}-\d{3}$/, 'CEP inválido')
-    .optional()
-    .or(z.literal('')),
+    .or(z.literal(''))
+    .optional(),
     
-  street: z.string().max(200).optional().or(z.literal('')),
-  number: z.string().max(20).optional().or(z.literal('')),
-  complement: z.string().max(100).optional().or(z.literal('')),
-  neighborhood: z.string().max(100).optional().or(z.literal('')),
-  city: z.string().max(100).optional().or(z.literal('')),
+  street: z.string().max(200).or(z.literal('')).optional(),
+  number: z.string().max(20).or(z.literal('')).optional(),
+  complement: z.string().max(100).or(z.literal('')).optional(),
+  neighborhood: z.string().max(100).or(z.literal('')).optional(),
+  city: z.string().max(100).or(z.literal('')).optional(),
   state: z.string().refine((val) => {
     if (!val || val === '') return true // Campo opcional
     return val.length === 2 && /^[A-Z]{2}$/.test(val)
-  }, 'Estado deve ter 2 letras maiúsculas (ex: SP)').optional().or(z.literal('')),
+  }, 'Estado deve ter 2 letras maiúsculas (ex: SP)').or(z.literal('')).optional(),
   
-  occupation: z.string().max(100).optional().or(z.literal('')),
-  insurance: z.string().max(100).optional().or(z.literal('')),
-  insuranceNumber: z.string().max(50).optional().or(z.literal('')),
+  occupation: z.string().max(100).or(z.literal('')).optional(),
+  insurance: z.string().max(100).or(z.literal('')).optional(),
+  insuranceNumber: z.string().max(50).or(z.literal('')).optional(),
   
-  generalNotes: z.string().optional().or(z.literal('')),
+  generalNotes: z.string().or(z.literal('')).optional(),
+  
+  // Fisioterapeuta responsável (opcional)
+  assignedTherapistId: z.string().or(z.literal('')).optional(),
   
   // Anamnese (campos opcionais)
-  chiefComplaint: z.string().optional().or(z.literal('')),
-  currentIllness: z.string().optional().or(z.literal('')),
-  medicalHistory: z.string().optional().or(z.literal('')),
-  medications: z.string().optional().or(z.literal('')),
-  allergies: z.string().optional().or(z.literal('')),
-  lifestyle: z.string().optional().or(z.literal('')),
-  physicalAssessment: z.string().optional().or(z.literal('')),
+  chiefComplaint: z.string().or(z.literal('')).optional(),
+  currentIllness: z.string().or(z.literal('')).optional(),
+  medicalHistory: z.string().or(z.literal('')).optional(),
+  medications: z.string().or(z.literal('')).optional(),
+  allergies: z.string().or(z.literal('')).optional(),
+  lifestyle: z.string().or(z.literal('')).optional(),
+  physicalAssessment: z.string().or(z.literal('')).optional(),
 })
 
 export const consultationSchema = z.object({

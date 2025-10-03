@@ -5,6 +5,7 @@ import { getLocalFilePath, fileExistsLocally } from '@/lib/local-storage'
 import { db as prisma } from '@/lib/db'
 import fs from 'fs'
 import path from 'path'
+import { canViewAllPatients } from '@/lib/permissions'
 
 export async function GET(
   request: NextRequest,
@@ -35,12 +36,18 @@ export async function GET(
 
     // Verificar se o usuário tem acesso ao arquivo
     const [patientId] = filePath
-    const patient = await prisma.patient.findFirst({
-      where: {
-        id: patientId,
-        userId: session.user.id,
-      },
-    })
+    
+    const where: any = {
+      id: patientId,
+      clinicId: session.user.clinicId,
+    }
+
+    // Fisioterapeutas só acessam arquivos de seus pacientes
+    if (!canViewAllPatients(session.user.role as any)) {
+      where.assignedTherapistId = session.user.id
+    }
+
+    const patient = await prisma.patient.findFirst({ where })
 
     if (!patient) {
       return NextResponse.json(

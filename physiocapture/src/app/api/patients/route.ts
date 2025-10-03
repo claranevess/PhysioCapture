@@ -21,10 +21,16 @@ export async function GET(request: Request) {
     const limit = parseInt(searchParams.get('limit') || '20')
     const sort = searchParams.get('sort') || 'created_desc'
 
-    // Construir where clause
+    // Construir where clause baseado na clínica e role do usuário
     const where: any = {
-      userId: session.user.id,
+      clinicId: session.user.clinicId, // Sempre filtrar pela clínica
     }
+
+    // Fisioterapeutas veem apenas seus pacientes atribuídos
+    if (session.user.role === 'PHYSIOTHERAPIST') {
+      where.assignedTherapistId = session.user.id
+    }
+    // Admin, Manager e Receptionist veem todos os pacientes da clínica
 
     if (search) {
       where.OR = [
@@ -64,6 +70,13 @@ export async function GET(request: Request) {
         skip,
         take: limit,
         include: {
+          assignedTherapist: {
+            select: {
+              id: true,
+              name: true,
+              crm: true,
+            },
+          },
           _count: {
             select: {
               consultations: true,
@@ -142,7 +155,13 @@ export async function POST(request: Request) {
       dateOfBirth: birthDate, // Convert to Date object
       cpf: validated.cpf.replace(/\D/g, ''), // Salvar CPF sem formatação
       age,
-      userId: session.user.id,
+      clinicId: session.user.clinicId, // Paciente pertence à clínica
+      // Lógica de atribuição:
+      // 1. Se foi fornecido assignedTherapistId no formulário, usar ele
+      // 2. Se não foi fornecido E o criador é fisioterapeuta, auto-atribuir a ele
+      // 3. Caso contrário, deixar sem atribuição (null)
+      assignedTherapistId: validated.assignedTherapistId || 
+        (session.user.role === 'PHYSIOTHERAPIST' ? session.user.id : undefined),
     }
     
     console.log('Dados para criar paciente:', patientData)
@@ -150,6 +169,13 @@ export async function POST(request: Request) {
     const patient = await db.patient.create({
       data: patientData,
       include: {
+        assignedTherapist: {
+          select: {
+            id: true,
+            name: true,
+            crm: true,
+          },
+        },
         _count: {
           select: {
             consultations: true,

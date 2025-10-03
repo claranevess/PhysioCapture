@@ -3,17 +3,26 @@ import { notFound } from 'next/navigation'
 import { authOptions } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { PatientForm } from '@/components/patients/patient-form'
+import { canViewAllPatients } from '@/lib/permissions'
 
 interface EditPatientPageProps {
-  params: { id: string }
+  params: Promise<{ id: string }>
 }
 
-async function getPatient(id: string, userId: string) {
+async function getPatient(id: string, clinicId: string, userId: string, userRole: string) {
+  // Montar o where baseado nas permissões
+  const where: any = {
+    id,
+    clinicId, // Sempre filtra pela clínica do usuário
+  }
+
+  // Se não pode ver todos os pacientes, só pode ver os atribuídos a ele
+  if (!canViewAllPatients(userRole as any)) {
+    where.assignedTherapistId = userId
+  }
+
   const patient = await db.patient.findFirst({
-    where: {
-      id,
-      userId,
-    },
+    where,
   })
 
   return patient
@@ -22,11 +31,19 @@ async function getPatient(id: string, userId: string) {
 export default async function EditPatientPage({ params }: EditPatientPageProps) {
   const session = await getServerSession(authOptions)
   
-  if (!session?.user) {
+  if (!session?.user?.clinicId || !session?.user?.role) {
     notFound()
   }
 
-  const patient = await getPatient(params.id, session.user.id)
+  // Await params no Next.js 15+
+  const { id } = await params
+
+  const patient = await getPatient(
+    id,
+    session.user.clinicId,
+    session.user.id,
+    session.user.role
+  )
 
   if (!patient) {
     notFound()

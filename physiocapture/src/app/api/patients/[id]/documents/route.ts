@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { db as prisma } from '@/lib/db'
 import { uploadFileLocally, validateFileType, validateFileSize } from '@/lib/local-storage'
+import { canViewAllPatients } from '@/lib/permissions'
 
 export async function POST(
   request: NextRequest,
@@ -12,20 +13,25 @@ export async function POST(
     const { id: patientId } = await params
     const session = await getServerSession(authOptions)
 
-    if (!session?.user?.id) {
+    if (!session?.user?.clinicId || !session?.user?.role) {
       return NextResponse.json(
         { error: 'Usuário não autenticado' },
         { status: 401 }
       )
     }
 
-    // Verificar se o paciente pertence ao usuário
-    const patient = await prisma.patient.findFirst({
-      where: {
-        id: patientId,
-        userId: session.user.id,
-      },
-    })
+    // Verificar se o paciente pertence à clínica e se usuário tem permissão
+    const where: any = {
+      id: patientId,
+      clinicId: session.user.clinicId,
+    }
+
+    // Fisioterapeutas só veem seus pacientes
+    if (!canViewAllPatients(session.user.role as any)) {
+      where.assignedTherapistId = session.user.id
+    }
+
+    const patient = await prisma.patient.findFirst({ where })
 
     if (!patient) {
       return NextResponse.json(
@@ -102,6 +108,7 @@ export async function POST(
         category: category as any,
         title: title || file.name,
         description: description || null,
+        clinicId: session.user.clinicId, // Documento pertence à clínica
         patientId,
         uploadedBy: session.user.id,
       },
@@ -136,7 +143,7 @@ export async function GET(
     const { id: patientId } = await params
     const session = await getServerSession(authOptions)
 
-    if (!session?.user?.id) {
+    if (!session?.user?.clinicId || !session?.user?.role) {
       return NextResponse.json(
         { error: 'Usuário não autenticado' },
         { status: 401 }
@@ -146,13 +153,18 @@ export async function GET(
     const { searchParams } = new URL(request.url)
     const category = searchParams.get('category')
 
-    // Verificar se o paciente pertence ao usuário
-    const patient = await prisma.patient.findFirst({
-      where: {
-        id: patientId,
-        userId: session.user.id,
-      },
-    })
+    // Verificar se o paciente pertence à clínica e se usuário tem permissão
+    const where: any = {
+      id: patientId,
+      clinicId: session.user.clinicId,
+    }
+
+    // Fisioterapeutas só veem seus pacientes
+    if (!canViewAllPatients(session.user.role as any)) {
+      where.assignedTherapistId = session.user.id
+    }
+
+    const patient = await prisma.patient.findFirst({ where })
 
     if (!patient) {
       return NextResponse.json(

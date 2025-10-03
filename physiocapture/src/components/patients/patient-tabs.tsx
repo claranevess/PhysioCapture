@@ -124,15 +124,6 @@ export function PatientTabs({ patient }: PatientTabsProps) {
                 </div>
               </div>
             </div>
-
-            <div className="flex justify-end">
-              <Button asChild>
-                <Link href={`/patients/${patient.id}/edit`}>
-                  <Edit className="h-4 w-4 mr-2" />
-                  Editar Informações
-                </Link>
-              </Button>
-            </div>
           </CardContent>
         </Card>
       </TabsContent>
@@ -295,7 +286,7 @@ export function PatientTabs({ patient }: PatientTabsProps) {
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>Anamnese</CardTitle>
             <Button variant="outline" asChild>
-              <Link href={`/patients/${patient.id}/anamnesis/edit`}>
+              <Link href={`/patients/${patient.id}/edit`}>
                 <Edit className="h-4 w-4 mr-2" />
                 Editar Anamnese
               </Link>

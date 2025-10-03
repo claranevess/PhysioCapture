@@ -16,20 +16,32 @@ import {
   Bell,
   Search,
   Menu,
-  X
+  X,
+  UserCog
 } from 'lucide-react'
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
+import { canManageUsers } from '@/lib/permissions'
+import type { UserRole } from '@/lib/permissions'
 
-const navigation = [
-  { name: 'Dashboard', href: '/dashboard', icon: Home, description: 'Visão geral do sistema' },
-  { name: 'Pacientes', href: '/patients', icon: Users, description: 'Gerenciar pacientes' },
-  { name: 'Documentos', href: '/documents', icon: FileText, description: 'Upload e gerenciamento de arquivos' },
+const baseNavigation = [
+  { name: 'Dashboard', href: '/dashboard', icon: Home, description: 'Visão geral do sistema', roles: ['ADMIN', 'MANAGER', 'PHYSIOTHERAPIST', 'RECEPTIONIST'] },
+  { name: 'Pacientes', href: '/patients', icon: Users, description: 'Gerenciar pacientes', roles: ['ADMIN', 'MANAGER', 'PHYSIOTHERAPIST', 'RECEPTIONIST'] },
+  { name: 'Documentos', href: '/documents', icon: FileText, description: 'Upload e gerenciamento de arquivos', roles: ['ADMIN', 'MANAGER', 'PHYSIOTHERAPIST', 'RECEPTIONIST'] },
+  { name: 'Usuários', href: '/users', icon: UserCog, description: 'Gerenciar usuários da clínica', roles: ['ADMIN'] },
 ]
 
 export function AuthLayout({ children }: { children: React.ReactNode }) {
   const { data: session } = useSession()
   const pathname = usePathname()
   const [sidebarOpen, setSidebarOpen] = useState(false)
+
+  // Filtrar navegação baseado no role do usuário
+  const navigation = useMemo(() => {
+    const userRole = session?.user?.role as UserRole | undefined
+    if (!userRole) return []
+    
+    return baseNavigation.filter(item => item.roles.includes(userRole))
+  }, [session?.user?.role])
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-blue-50/30">
@@ -105,7 +117,7 @@ export function AuthLayout({ children }: { children: React.ReactNode }) {
 
         {/* User info e logout */}
         <div className="absolute bottom-0 left-0 right-0 p-6 border-t border-gray-200/50 bg-gradient-to-r from-gray-50/80 to-gray-100/50 backdrop-blur-sm">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between mb-3">
             <div className="flex items-center space-x-4 flex-1 min-w-0">
               <div className="w-12 h-12 bg-gradient-primary rounded-2xl flex items-center justify-center shadow-primary">
                 <User className="w-6 h-6 text-white" />
@@ -127,6 +139,23 @@ export function AuthLayout({ children }: { children: React.ReactNode }) {
               <LogOut className="w-5 h-5" />
             </button>
           </div>
+          {/* Role badge */}
+          {session?.user?.role && (
+            <div className="flex items-center justify-center">
+              <span className={cn(
+                "inline-flex items-center px-3 py-1 rounded-lg text-xs font-medium",
+                session.user.role === 'ADMIN' && "bg-purple-100 text-purple-700",
+                session.user.role === 'MANAGER' && "bg-blue-100 text-blue-700",
+                session.user.role === 'PHYSIOTHERAPIST' && "bg-green-100 text-green-700",
+                session.user.role === 'RECEPTIONIST' && "bg-orange-100 text-orange-700"
+              )}>
+                {session.user.role === 'ADMIN' && 'Administrador'}
+                {session.user.role === 'MANAGER' && 'Gestor'}
+                {session.user.role === 'PHYSIOTHERAPIST' && 'Fisioterapeuta'}
+                {session.user.role === 'RECEPTIONIST' && 'Recepcionista'}
+              </span>
+            </div>
+          )}
         </div>
       </div>
 

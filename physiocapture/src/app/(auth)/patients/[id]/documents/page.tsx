@@ -34,7 +34,7 @@ export default function PatientDocumentsPage() {
         const patientResponse = await fetch(`/api/patients/${patientId}`)
         if (patientResponse.ok) {
           const patientData = await patientResponse.json()
-          setPatient(patientData.patient)
+          setPatient(patientData) // Corrigido: API retorna o paciente diretamente
         }
 
         // Carregar documentos
@@ -58,7 +58,7 @@ export default function PatientDocumentsPage() {
     if (patientId) {
       loadData()
     }
-  }, [patientId, toast])
+  }, [patientId]) // Removido 'toast' das dependências
 
   // Callback para quando upload for concluído
   const handleUploadComplete = (document: DocumentWithRelations) => {
