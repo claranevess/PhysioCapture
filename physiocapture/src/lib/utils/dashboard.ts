@@ -100,3 +100,34 @@ export function formatPercentage(value: number): string {
   const sign = value > 0 ? '+' : ''
   return `${sign}${value}%`
 }
+
+export function groupRegistrationsByDate(
+  registrations: Array<{ createdAt: Date }>,
+  periodDays: number = 7
+): Array<{ date: string; consultations: number }> {
+  const today = new Date()
+  const data: Array<{ date: string; consultations: number }> = []
+  
+  for (let i = periodDays - 1; i >= 0; i--) {
+    const date = new Date(today)
+    date.setDate(date.getDate() - i)
+    date.setHours(0, 0, 0, 0)
+    
+    const nextDay = new Date(date)
+    nextDay.setDate(nextDay.getDate() + 1)
+    
+    const count = registrations.filter(r => {
+      const regDate = new Date(r.createdAt)
+      return regDate >= date && regDate < nextDay
+    }).length
+    
+    const label = date.toLocaleDateString('pt-BR', { 
+      day: '2-digit', 
+      month: '2-digit' 
+    })
+    
+    data.push({ date: label, consultations: count })
+  }
+  
+  return data
+}

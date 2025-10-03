@@ -80,22 +80,30 @@ export function UserList({ onAddUser, onEditUser }: UserListProps) {
 
   const loadUsers = async () => {
     try {
+      setLoading(true)
       const params = new URLSearchParams()
       if (search) params.append('search', search)
       if (roleFilter !== 'all') params.append('role', roleFilter)
       if (statusFilter !== 'all') params.append('isActive', statusFilter)
 
+      console.log('🔍 Carregando usuários com params:', params.toString())
       const response = await fetch(`/api/users?${params}`)
       const data = await response.json()
 
+      console.log('📥 Resposta da API:', { status: response.status, data })
+
       if (response.ok) {
-        setUsers(data.data)
+        setUsers(data.data || [])
+        console.log('✅ Usuários carregados:', data.data?.length || 0)
       } else {
+        console.error('❌ Erro na resposta:', data)
         toast.error(data.error || 'Erro ao carregar usuários')
+        setUsers([])
       }
     } catch (error) {
-      console.error('Erro ao carregar usuários:', error)
+      console.error('❌ Erro ao carregar usuários:', error)
       toast.error('Erro ao carregar usuários')
+      setUsers([])
     } finally {
       setLoading(false)
     }
@@ -125,12 +133,17 @@ export function UserList({ onAddUser, onEditUser }: UserListProps) {
   if (loading) {
     return (
       <Card>
-        <CardContent className="p-6">
-          <p className="text-center text-muted-foreground">Carregando usuários...</p>
+        <CardContent className="p-12">
+          <div className="flex flex-col items-center justify-center gap-4">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+            <p className="text-center text-muted-foreground">Carregando usuários...</p>
+          </div>
         </CardContent>
       </Card>
     )
   }
+
+  console.log('👥 Renderizando lista com', users.length, 'usuários')
 
   return (
     <div className="space-y-4">

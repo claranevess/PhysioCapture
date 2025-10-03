@@ -19,12 +19,16 @@ const userSchema = z.object({
 export async function GET(request: Request) {
   try {
     const session = await getServerSession(authOptions)
+    console.log('🔐 Sessão na API /users:', session?.user)
+    
     if (!session?.user) {
+      console.log('❌ Usuário não autenticado')
       return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
     }
 
     // Apenas ADMIN pode listar usuários
     if (session.user.role !== 'ADMIN') {
+      console.log('❌ Usuário sem permissão:', session.user.role)
       return NextResponse.json(
         { error: 'Sem permissão para listar usuários' },
         { status: 403 }
@@ -35,6 +39,8 @@ export async function GET(request: Request) {
     const search = searchParams.get('search') || ''
     const role = searchParams.get('role')
     const isActive = searchParams.get('isActive')
+
+    console.log('🔍 Filtros:', { search, role, isActive, clinicId: session.user.clinicId })
 
     // Construir where clause
     const where: any = {
@@ -53,9 +59,11 @@ export async function GET(request: Request) {
       where.role = role
     }
 
-    if (isActive !== null && isActive !== undefined) {
+    if (isActive && isActive !== 'all') {
       where.isActive = isActive === 'true'
     }
+
+    console.log('📊 Where clause:', JSON.stringify(where, null, 2))
 
     const users = await db.user.findMany({
       where,
@@ -80,9 +88,10 @@ export async function GET(request: Request) {
       },
     })
 
+    console.log('✅ Usuários encontrados:', users.length)
     return NextResponse.json({ data: users })
   } catch (error) {
-    console.error('Erro ao buscar usuários:', error)
+    console.error('❌ Erro ao buscar usuários:', error)
     return NextResponse.json(
       { error: 'Erro ao buscar usuários' },
       { status: 500 }

@@ -6,6 +6,7 @@ import { Users, UserPlus, Calendar, TrendingUp } from 'lucide-react'
 import Link from 'next/link'
 import { ConsultationChart } from './consultation-chart'
 import { StatCardWithTrend } from './stat-card-with-trend'
+import { groupRegistrationsByDate } from '@/lib/utils/dashboard'
 
 interface ReceptionistDashboardClientProps {
   totalPatients: number
@@ -49,6 +50,8 @@ export function ReceptionistDashboardClient({
   previousWeekRegistrations,
   previousMonthRegistrations,
 }: ReceptionistDashboardClientProps) {
+  const chartData = groupRegistrationsByDate(last7DaysRegistrations, 7)
+
   // Cálculo de tendências
   const weekGrowth = previousWeekRegistrations > 0
     ? ((last7DaysRegistrations.length - previousWeekRegistrations) / previousWeekRegistrations) * 100
@@ -102,7 +105,7 @@ export function ReceptionistDashboardClient({
 
       {/* Gráfico de cadastros */}
       <ConsultationChart
-        data={last7DaysRegistrations}
+        data={chartData}
         title="Novos Cadastros (7 dias)"
         description="Pacientes cadastrados nos últimos 7 dias"
       />

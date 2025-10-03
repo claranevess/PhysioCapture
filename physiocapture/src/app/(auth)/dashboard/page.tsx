@@ -29,25 +29,24 @@ async function AdminDashboard({ clinicId }: { clinicId: string }) {
     totalPatients,
     activePatients,
     totalUsers,
-    activeUsers,
     totalConsultations,
     monthConsultations,
     todayConsultations,
-    clinics,
+    clinic,
     recentUsers,
     usersByRoleRaw,
     last7DaysConsultations,
     previousWeekConsultations,
     previousMonthConsultations
   ] = await Promise.all([
-    db.patient.count(),
-    db.patient.count({ where: { status: 'ACTIVE' } }),
-    db.user.count(),
-    db.user.count({ where: { status: 'ACTIVE' } }),
-    db.consultation.count(),
-    db.consultation.count({ where: { date: { gte: firstDayOfMonth } } }),
-    db.consultation.count({ where: { date: { gte: today } } }),
-    db.clinic.findMany({
+    db.patient.count({ where: { clinicId } }),
+    db.patient.count({ where: { clinicId, status: 'ACTIVE' } }),
+    db.user.count({ where: { clinicId } }),
+    db.consultation.count({ where: { clinicId } }),
+    db.consultation.count({ where: { clinicId, date: { gte: firstDayOfMonth } } }),
+    db.consultation.count({ where: { clinicId, date: { gte: today } } }),
+    db.clinic.findUnique({
+      where: { id: clinicId },
       select: {
         id: true,
         name: true,
@@ -57,6 +56,7 @@ async function AdminDashboard({ clinicId }: { clinicId: string }) {
       }
     }),
     db.user.findMany({
+      where: { clinicId },
       take: 5,
       orderBy: { createdAt: 'desc' },
       select: {
@@ -69,19 +69,22 @@ async function AdminDashboard({ clinicId }: { clinicId: string }) {
     }),
     db.user.groupBy({
       by: ['role'],
+      where: { clinicId },
       _count: { id: true }
     }),
     db.consultation.findMany({
-      where: { date: { gte: sevenDaysAgo } },
+      where: { clinicId, date: { gte: sevenDaysAgo } },
       select: { id: true, date: true }
     }),
     db.consultation.count({ 
       where: { 
+        clinicId,
         date: { gte: fourteenDaysAgo, lt: sevenDaysAgo }
       }
     }),
     db.consultation.count({
       where: {
+        clinicId,
         date: { gte: firstDayOfLastMonth, lte: lastDayOfLastMonth }
       }
     })
@@ -96,13 +99,13 @@ async function AdminDashboard({ clinicId }: { clinicId: string }) {
   return (
     <AdminDashboardClient
       totalUsers={totalUsers}
-      activeUsers={activeUsers}
+      activeUsers={totalUsers}
       totalPatients={totalPatients}
       activePatients={activePatients}
       totalConsultations={totalConsultations}
       monthConsultations={monthConsultations}
       todayConsultations={todayConsultations}
-      clinics={clinics}
+      clinic={clinic}
       recentUsers={recentUsers}
       usersByRole={usersByRole}
       last7DaysConsultations={last7DaysConsultations}

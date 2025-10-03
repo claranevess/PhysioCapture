@@ -7,6 +7,7 @@ import Link from 'next/link'
 import { ConsultationChart } from './consultation-chart'
 import { DistributionChart } from './distribution-chart'
 import { StatCardWithTrend } from './stat-card-with-trend'
+import { groupConsultationsByDate } from '@/lib/utils/dashboard'
 
 interface AdminDashboardClientProps {
   totalUsers: number
@@ -16,16 +17,16 @@ interface AdminDashboardClientProps {
   totalConsultations: number
   monthConsultations: number
   todayConsultations: number
-  clinics: Array<{
+  clinic: {
     id: string
     name: string
     _count: { users: number; patients: number }
-  }>
+  } | null
   recentUsers: Array<{
     id: string
     name: string
     email: string
-    role: string
+    role?: string
     createdAt: Date
   }>
   usersByRole: Array<{
@@ -48,7 +49,7 @@ export function AdminDashboardClient({
   totalConsultations,
   monthConsultations,
   todayConsultations,
-  clinics,
+  clinic,
   recentUsers,
   usersByRole,
   last7DaysConsultations,
@@ -63,6 +64,23 @@ export function AdminDashboardClient({
   const monthGrowth = previousMonthConsultations > 0
     ? ((monthConsultations - previousMonthConsultations) / previousMonthConsultations) * 100
     : 0
+
+  // Transformar dados para o gráfico
+  const chartData = groupConsultationsByDate(last7DaysConsultations, 7)
+
+  // Tradução dos roles
+  const roleLabels: Record<string, string> = {
+    'ADMIN': 'Administrador',
+    'MANAGER': 'Gerente',
+    'PHYSIOTHERAPIST': 'Fisioterapeuta',
+    'RECEPTIONIST': 'Recepcionista'
+  }
+
+  // Traduzir nomes dos roles no gráfico
+  const translatedUsersByRole = usersByRole.map(role => ({
+    name: roleLabels[role.name] || role.name,
+    value: role.value
+  }))
 
   return (
     <div className="space-y-6">
@@ -110,52 +128,52 @@ export function AdminDashboardClient({
       <div className="grid gap-4 md:grid-cols-2">
         {/* Evolução de consultas */}
         <ConsultationChart
-          data={last7DaysConsultations}
+          data={chartData}
           title="Evolução de Consultas (7 dias)"
           description="Total de consultas nos últimos 7 dias"
         />
 
         {/* Distribuição de usuários por função */}
         <DistributionChart
-          data={usersByRole}
+          data={translatedUsersByRole}
           title="Distribuição de Usuários"
           description="Usuários por função no sistema"
         />
       </div>
 
-      {/* Grid com clínicas e usuários recentes */}
+      {/* Grid com informações da clínica e usuários recentes */}
       <div className="grid gap-4 md:grid-cols-2">
-        {/* Clínicas */}
+        {/* Informações da Clínica */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Shield className="h-5 w-5" />
-              Clínicas
+              Minha Clínica
             </CardTitle>
-            <CardDescription>Visão geral das clínicas cadastradas</CardDescription>
+            <CardDescription>Visão geral da sua clínica</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3">
-              {clinics.map((clinic) => (
-                <div
-                  key={clinic.id}
-                  className="flex items-center justify-between p-3 rounded-md border hover:bg-accent transition-colors"
-                >
-                  <div>
-                    <p className="font-medium">{clinic.name}</p>
-                    <div className="flex gap-3 text-sm text-muted-foreground">
-                      <span>{clinic._count.users} usuários</span>
-                      <span>{clinic._count.patients} pacientes</span>
+            {clinic ? (
+              <div className="space-y-3">
+                <div className="p-4 rounded-md border bg-accent/50">
+                  <p className="font-semibold text-lg mb-2">{clinic.name}</p>
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    <div className="flex flex-col">
+                      <span className="text-muted-foreground">Usuários</span>
+                      <span className="font-medium text-lg">{clinic._count.users}</span>
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-muted-foreground">Pacientes</span>
+                      <span className="font-medium text-lg">{clinic._count.patients}</span>
                     </div>
                   </div>
                 </div>
-              ))}
-              {clinics.length === 0 && (
-                <p className="text-sm text-muted-foreground text-center py-4">
-                  Nenhuma clínica cadastrada
-                </p>
-              )}
-            </div>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground text-center py-4">
+                Informações da clínica não disponíveis
+              </p>
+            )}
           </CardContent>
         </Card>
 
@@ -182,7 +200,7 @@ export function AdminDashboardClient({
                       user.role === 'MANAGER' ? 'secondary' :
                       user.role === 'PHYSIOTHERAPIST' ? 'outline' : 'outline'
                     }>
-                      {user.role}
+                      {user.role ? roleLabels[user.role] || user.role : 'N/A'}
                     </Badge>
                     <span className="text-xs text-muted-foreground">
                       {new Date(user.createdAt).toLocaleDateString('pt-BR')}

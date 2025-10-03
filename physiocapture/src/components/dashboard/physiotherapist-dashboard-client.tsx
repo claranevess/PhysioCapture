@@ -29,7 +29,10 @@ interface PhysiotherapistDashboardClientProps {
     phone: string | null
     email: string | null
   }>
-  last7DaysConsultations: Array<{ date: Date }>
+    last7DaysConsultations: Array<{
+    id?: string
+    date: Date
+  }>
 }
 
 export function PhysiotherapistDashboardClient({
