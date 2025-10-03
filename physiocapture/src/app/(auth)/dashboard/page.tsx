@@ -1,369 +1,617 @@
-import { getServerSession } from 'next-auth'
+﻿import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { db } from '@/lib/db'
-import { StatCard, Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card-new'
-import { PrimaryButton, OutlineButton } from '@/components/ui/button-new'
-import { StatusBadge } from '@/components/ui/badge-new'
-import { Users, FileText, Stethoscope, Plus, Activity, Calendar, TrendingUp, Upload } from 'lucide-react'
+import { redirect } from 'next/navigation'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Users, FileText, Calendar, Activity, UserPlus, TrendingUp } from 'lucide-react'
 import Link from 'next/link'
 
-async function getDashboardData(userId: string, clinicId: string, userRole: string) {
-  try {
-    // Construir where baseado na role
-    const patientWhere: any = { clinicId }
-    if (userRole === 'PHYSIOTHERAPIST') {
-      patientWhere.assignedTherapistId = userId
-    }
+// Dashboard para ADMIN - Visão estratégica da clínica
+async function AdminDashboard({ clinicId }: { clinicId: string }) {
+  const [totalPatients, activePatients, totalUsers, totalDocuments, usersByRole] = await Promise.all([
+    db.patient.count({ where: { clinicId } }),
+    db.patient.count({ where: { clinicId, status: 'ACTIVE' } }),
+    db.user.count({ where: { clinicId } }),
+    db.document.count({ where: { clinicId } }),
+    db.user.groupBy({
+      by: ['role'],
+      where: { clinicId },
+      _count: { id: true }
+    })
+  ])
 
-    const [
-      totalPatients,
-      activePatients,
-      totalConsultations,
-      totalDocuments,
-      recentPatients,
-      recentConsultations,
-    ] = await Promise.all([
-      db.patient.count({ 
-        where: patientWhere
-      }),
-      db.patient.count({ 
-        where: { ...patientWhere, status: 'ACTIVE' }
-      }),
-      db.consultation.count({ 
-        where: { clinicId }
-      }),
-      db.document.count({ 
-        where: { clinicId }
-      }),
-      db.patient.findMany({
-        where: patientWhere,
-        orderBy: { createdAt: 'desc' },
-        take: 3,
-        select: {
-          id: true,
-          fullName: true,
-          createdAt: true,
-        },
-      }),
-      db.consultation.findMany({
-        where: { clinicId },
-        orderBy: { date: 'desc' },
-        take: 3,
-        select: {
-          id: true,
-          date: true,
-          patient: {
-            select: {
-              id: true,
-              fullName: true,
-            },
-          },
-        },
-      }),
-    ])
-
-    return {
-      totalPatients,
-      activePatients,
-      totalConsultations,
-      totalDocuments,
-      recentPatients,
-      recentConsultations,
-    }
-  } catch (error) {
-    console.error('Erro ao carregar dados do dashboard:', error)
-    return {
-      totalPatients: 0,
-      activePatients: 0,
-      totalConsultations: 0,
-      totalDocuments: 0,
-      recentPatients: [],
-      recentConsultations: [],
-    }
+  const roleLabels: Record<string, string> = {
+    ADMIN: 'Administradores',
+    MANAGER: 'Gerentes',
+    PHYSIOTHERAPIST: 'Fisioterapeutas',
+    RECEPTIONIST: 'Recepcionistas'
   }
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-3xl font-bold">Gestão da Clínica</h1>
+        <p className="text-muted-foreground">Visão geral estratégica e gerenciamento de recursos</p>
+      </div>
+
+      {/* Cards de métricas principais */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total de Usuários</CardTitle>
+            <Users className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{totalUsers}</div>
+            <p className="text-xs text-muted-foreground">Equipe da clínica</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Pacientes Ativos</CardTitle>
+            <Activity className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{activePatients}</div>
+            <p className="text-xs text-muted-foreground">de {totalPatients} cadastrados</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Documentos</CardTitle>
+            <FileText className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{totalDocuments}</div>
+            <p className="text-xs text-muted-foreground">Arquivos armazenados</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Taxa de Ativação</CardTitle>
+            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {totalPatients > 0 ? Math.round((activePatients / totalPatients) * 100) : 0}%
+            </div>
+            <p className="text-xs text-muted-foreground">Pacientes ativos</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Distribuição da equipe */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Distribuição da Equipe</CardTitle>
+          <CardDescription>Usuários por função na clínica</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-3">
+            {usersByRole.map((group) => (
+              <div key={group.role} className="flex items-center justify-between">
+                <span className="text-sm font-medium">{roleLabels[group.role] || group.role}</span>
+                <span className="text-sm text-muted-foreground">{group._count.id} usuário(s)</span>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Ações rápidas */}
+      <div className="grid gap-4 md:grid-cols-3">
+        <Link href="/users">
+          <Card className="hover:bg-accent cursor-pointer transition-colors">
+            <CardHeader>
+              <CardTitle className="text-base">Gerenciar Usuários</CardTitle>
+              <CardDescription>Adicionar ou editar membros da equipe</CardDescription>
+            </CardHeader>
+          </Card>
+        </Link>
+
+        <Link href="/patients">
+          <Card className="hover:bg-accent cursor-pointer transition-colors">
+            <CardHeader>
+              <CardTitle className="text-base">Ver Pacientes</CardTitle>
+              <CardDescription>Lista completa de pacientes</CardDescription>
+            </CardHeader>
+          </Card>
+        </Link>
+
+        <Link href="/documents">
+          <Card className="hover:bg-accent cursor-pointer transition-colors">
+            <CardHeader>
+              <CardTitle className="text-base">Documentos</CardTitle>
+              <CardDescription>Gerenciar arquivos da clínica</CardDescription>
+            </CardHeader>
+          </Card>
+        </Link>
+      </div>
+    </div>
+  )
+}
+
+// Dashboard para MANAGER - Operações e performance
+async function ManagerDashboard({ clinicId }: { clinicId: string }) {
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  
+  const [
+    totalPatients,
+    todayConsultations,
+    monthConsultations,
+    recentPatients,
+    therapistStats
+  ] = await Promise.all([
+    db.patient.count({ where: { clinicId } }),
+    db.consultation.count({
+      where: {
+        clinicId,
+        date: { gte: today }
+      }
+    }),
+    db.consultation.count({
+      where: {
+        clinicId,
+        date: {
+          gte: new Date(today.getFullYear(), today.getMonth(), 1)
+        }
+      }
+    }),
+    db.patient.findMany({
+      where: { clinicId },
+      orderBy: { createdAt: 'desc' },
+      take: 5,
+      select: {
+        id: true,
+        fullName: true,
+        createdAt: true
+      }
+    }),
+    db.user.findMany({
+      where: {
+        clinicId,
+        role: 'PHYSIOTHERAPIST'
+      },
+      select: {
+        id: true,
+        name: true,
+        _count: {
+          select: {
+            assignedPatients: true,
+            consultations: true
+          }
+        }
+      }
+    })
+  ])
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-3xl font-bold">Gestão Operacional</h1>
+        <p className="text-muted-foreground">Acompanhamento de atividades e desempenho da equipe</p>
+      </div>
+
+      {/* Métricas do dia */}
+      <div className="grid gap-4 md:grid-cols-3">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Consultas Hoje</CardTitle>
+            <Calendar className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{todayConsultations}</div>
+            <p className="text-xs text-muted-foreground">Atendimentos de hoje</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Consultas no Mês</CardTitle>
+            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{monthConsultations}</div>
+            <p className="text-xs text-muted-foreground">Até o momento</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total de Pacientes</CardTitle>
+            <Users className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{totalPatients}</div>
+            <p className="text-xs text-muted-foreground">Base de pacientes</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Performance dos fisioterapeutas */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Desempenho da Equipe</CardTitle>
+          <CardDescription>Carga de trabalho dos fisioterapeutas</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {therapistStats.map((therapist) => (
+              <div key={therapist.id} className="flex items-center justify-between border-b pb-3 last:border-0">
+                <div>
+                  <p className="font-medium">{therapist.name}</p>
+                  <p className="text-sm text-muted-foreground">
+                    {therapist._count.assignedPatients} pacientes atribuídos
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm font-medium">{therapist._count.consultations}</p>
+                  <p className="text-xs text-muted-foreground">consultas realizadas</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Pacientes recentes */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Cadastros Recentes</CardTitle>
+          <CardDescription>Últimos pacientes registrados</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-3">
+            {recentPatients.map((patient) => (
+              <Link 
+                key={patient.id}
+                href={`/patients/${patient.id}`}
+                className="flex items-center justify-between hover:bg-accent p-2 rounded-md transition-colors"
+              >
+                <span className="font-medium">{patient.fullName}</span>
+                <span className="text-sm text-muted-foreground">
+                  {new Date(patient.createdAt).toLocaleDateString('pt-BR')}
+                </span>
+              </Link>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
+// Dashboard para PHYSIOTHERAPIST - Trabalho clínico
+async function PhysiotherapistDashboard({ userId, clinicId }: { userId: string, clinicId: string }) {
+  const thirtyDaysAgo = new Date()
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+
+  const [
+    myPatients,
+    recentConsultations,
+    patientsNeedingFollowup
+  ] = await Promise.all([
+    db.patient.count({
+      where: {
+        assignedTherapistId: userId,
+        clinicId
+      }
+    }),
+    db.consultation.findMany({
+      where: {
+        performedBy: userId,
+        clinicId
+      },
+      orderBy: { date: 'desc' },
+      take: 10,
+      include: {
+        patient: {
+          select: {
+            id: true,
+            fullName: true
+          }
+        }
+      }
+    }),
+    db.patient.findMany({
+      where: {
+        assignedTherapistId: userId,
+        clinicId,
+        OR: [
+          { lastVisitDate: { lt: thirtyDaysAgo } },
+          { lastVisitDate: null }
+        ]
+      },
+      select: {
+        id: true,
+        fullName: true,
+        lastVisitDate: true
+      },
+      take: 10
+    })
+  ])
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-3xl font-bold">Meus Pacientes</h1>
+        <p className="text-muted-foreground">Acompanhamento clínico e consultas</p>
+      </div>
+
+      {/* Métricas do fisioterapeuta */}
+      <div className="grid gap-4 md:grid-cols-3">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Meus Pacientes</CardTitle>
+            <Users className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{myPatients}</div>
+            <p className="text-xs text-muted-foreground">Sob meus cuidados</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Consultas Recentes</CardTitle>
+            <Calendar className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{recentConsultations.length}</div>
+            <p className="text-xs text-muted-foreground">Últimos atendimentos</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Precisam Retorno</CardTitle>
+            <Activity className="h-4 w-4 text-orange-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-orange-500">{patientsNeedingFollowup.length}</div>
+            <p className="text-xs text-muted-foreground">&gt;30 dias sem consulta</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Consultas recentes */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Atendimentos Recentes</CardTitle>
+          <CardDescription>Suas últimas consultas realizadas</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-3">
+            {recentConsultations.map((consultation) => (
+              <Link
+                key={consultation.id}
+                href={`/patients/${consultation.patientId}`}
+                className="flex items-center justify-between hover:bg-accent p-2 rounded-md transition-colors"
+              >
+                <div>
+                  <p className="font-medium">{consultation.patient.fullName}</p>
+                  <p className="text-sm text-muted-foreground">{consultation.type}</p>
+                </div>
+                <span className="text-sm text-muted-foreground">
+                  {new Date(consultation.date).toLocaleDateString('pt-BR')}
+                </span>
+              </Link>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Pacientes precisando retorno */}
+      {patientsNeedingFollowup.length > 0 && (
+        <Card className="border-orange-200">
+          <CardHeader>
+            <CardTitle className="text-orange-700">Atenção: Pacientes Precisam Retorno</CardTitle>
+            <CardDescription>Sem consulta há mais de 30 dias</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {patientsNeedingFollowup.map((patient) => (
+                <Link
+                  key={patient.id}
+                  href={`/patients/${patient.id}`}
+                  className="flex items-center justify-between hover:bg-orange-50 p-2 rounded-md transition-colors"
+                >
+                  <span className="font-medium">{patient.fullName}</span>
+                  <span className="text-sm text-muted-foreground">
+                    {patient.lastVisitDate 
+                      ? `Última consulta: ${new Date(patient.lastVisitDate).toLocaleDateString('pt-BR')}`
+                      : 'Nunca consultou'
+                    }
+                  </span>
+                </Link>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  )
+}
+
+// Dashboard para RECEPTIONIST - Cadastros e administrativo
+async function ReceptionistDashboard({ clinicId }: { clinicId: string }) {
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+
+  const [
+    totalPatients,
+    todayPatients,
+    recentPatients
+  ] = await Promise.all([
+    db.patient.count({ where: { clinicId } }),
+    db.patient.count({
+      where: {
+        clinicId,
+        createdAt: { gte: today }
+      }
+    }),
+    db.patient.findMany({
+      where: { clinicId },
+      orderBy: { createdAt: 'desc' },
+      take: 15,
+      select: {
+        id: true,
+        fullName: true,
+        phone: true,
+        createdAt: true,
+        status: true
+      }
+    })
+  ])
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-3xl font-bold">Recepção</h1>
+        <p className="text-muted-foreground">Cadastros e atendimento de pacientes</p>
+      </div>
+
+      {/* Métricas */}
+      <div className="grid gap-4 md:grid-cols-3">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total de Pacientes</CardTitle>
+            <Users className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{totalPatients}</div>
+            <p className="text-xs text-muted-foreground">Na base de dados</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Cadastrados Hoje</CardTitle>
+            <UserPlus className="h-4 w-4 text-green-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-500">{todayPatients}</div>
+            <p className="text-xs text-muted-foreground">Novos pacientes</p>
+          </CardContent>
+        </Card>
+
+        <Link href="/patients/new">
+          <Card className="hover:bg-accent cursor-pointer transition-colors border-primary">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Cadastrar Paciente</CardTitle>
+              <UserPlus className="h-4 w-4 text-primary" />
+            </CardHeader>
+            <CardContent>
+              <p className="text-xs text-muted-foreground">Clique para adicionar novo</p>
+            </CardContent>
+          </Card>
+        </Link>
+      </div>
+
+      {/* Lista de cadastros recentes */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Cadastros Recentes</CardTitle>
+          <CardDescription>Últimos pacientes registrados no sistema</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-2">
+            {recentPatients.map((patient) => (
+              <Link
+                key={patient.id}
+                href={`/patients/${patient.id}`}
+                className="flex items-center justify-between hover:bg-accent p-3 rounded-md transition-colors border"
+              >
+                <div className="flex-1">
+                  <p className="font-medium">{patient.fullName}</p>
+                  <p className="text-sm text-muted-foreground">{patient.phone}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm">
+                    {new Date(patient.createdAt).toLocaleDateString('pt-BR')}
+                  </p>
+                  <span className={`text-xs px-2 py-1 rounded ${
+                    patient.status === 'ACTIVE' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'
+                  }`}>
+                    {patient.status === 'ACTIVE' ? 'Ativo' : 'Inativo'}
+                  </span>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Ações rápidas */}
+      <div className="grid gap-4 md:grid-cols-2">
+        <Link href="/patients">
+          <Card className="hover:bg-accent cursor-pointer transition-colors">
+            <CardHeader>
+              <CardTitle className="text-base">Ver Todos os Pacientes</CardTitle>
+              <CardDescription>Lista completa de pacientes cadastrados</CardDescription>
+            </CardHeader>
+          </Card>
+        </Link>
+
+        <Link href="/documents/upload">
+          <Card className="hover:bg-accent cursor-pointer transition-colors">
+            <CardHeader>
+              <CardTitle className="text-base">Upload de Documentos</CardTitle>
+              <CardDescription>Adicionar arquivos de pacientes</CardDescription>
+            </CardHeader>
+          </Card>
+        </Link>
+      </div>
+    </div>
+  )
 }
 
 export default async function DashboardPage() {
   const session = await getServerSession(authOptions)
   
   if (!session?.user) {
-    return null
+    redirect('/auth/signin')
   }
 
-  const data = await getDashboardData(
-    session.user.id, 
-    session.user.clinicId,
-    session.user.role
-  )
+  const { id: userId, clinicId, role: userRole } = session.user
 
-  return (
-    <div className="space-y-8 animate-fade-in">
-      {/* Header aprimorado */}
-      <div className="relative">
-        <div className="absolute inset-0 bg-gradient-to-r from-primary-50/50 to-secondary-50/50 rounded-3xl"></div>
-        <div className="relative p-8 rounded-3xl">
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <h1 className="text-4xl lg:text-5xl font-bold font-display text-gray-900 mb-3">
-                Olá, {session.user.name?.split(' ')[0]}! 👋
-              </h1>
-              <p className="text-gray-600 text-lg lg:text-xl mb-4 lg:mb-0">
-                Bem-vindo ao <span className="text-gradient-primary font-semibold">Physio Capture</span>
-              </p>
-              <p className="text-gray-500 text-sm">
-                Gerencie seus pacientes e documentos de forma inteligente
-              </p>
-            </div>
-            <div className="mt-6 lg:mt-0">
-              <div className="bg-white/70 backdrop-blur-sm rounded-2xl p-4 shadow-lg border border-white/20">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 bg-gradient-primary rounded-xl flex items-center justify-center shadow-primary">
-                    <Calendar className="w-6 h-6 text-white" />
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-600">Hoje</p>
-                    <p className="font-semibold text-gray-900">
-                      {new Date().toLocaleDateString('pt-BR', { 
-                        weekday: 'long', 
-                        day: 'numeric', 
-                        month: 'long' 
-                      })}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Cards de estatísticas aprimorados */}
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-        <div className="group">
-          <StatCard
-            title="Total de Pacientes"
-            value={data.totalPatients}
-            change={`${data.activePatients} ativos`}
-            icon={Users}
-            trend="up"
-            className="hover-lift hover-scale group-hover:shadow-primary-lg transition-all duration-300"
-          />
-        </div>
-        
-        <div className="group">
-          <StatCard
-            title="Pacientes Ativos"
-            value={data.activePatients}
-            icon={Activity}
-            trend="up"
-            className="hover-lift hover-scale group-hover:shadow-secondary-lg transition-all duration-300"
-          />
-        </div>
-
-        <div className="group">
-          <StatCard
-            title="Consultas"
-            value={data.totalConsultations}
-            change="Total realizadas"
-            icon={Stethoscope}
-            trend="up"
-            className="hover-lift hover-scale group-hover:shadow-success-lg transition-all duration-300"
-          />
-        </div>
-
-        <div className="group">
-          <StatCard
-            title="Documentos"
-            value={data.totalDocuments}
-            change="Arquivos armazenados"
-            icon={FileText}
-            trend="up"
-            className="hover-lift hover-scale group-hover:shadow-lg transition-all duration-300"
-          />
-        </div>
-      </div>
-
-      {/* Ações Rápidas aprimoradas */}
-      <Card variant="bordered" className="relative overflow-hidden bg-gradient-to-br from-blue-50/80 via-white to-cyan-50/80 border-0 shadow-xl">
-        <div className="absolute inset-0 bg-gradient-to-r from-primary-500/5 to-secondary-500/5"></div>
-        <CardHeader className="relative">
-          <CardTitle className="text-xl font-display text-gray-900 flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-primary rounded-xl flex items-center justify-center shadow-primary">
-              <Plus className="h-5 w-5 text-white" />
-            </div>
-            <span>Ações Rápidas</span>
-            <div className="ml-auto">
-              <TrendingUp className="h-5 w-5 text-primary-500 animate-bounce-gentle" />
-            </div>
-          </CardTitle>
-          <p className="text-gray-600 text-sm">Acelere seu fluxo de trabalho</p>
-        </CardHeader>
-        <CardContent className="relative">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Link href="/patients/new" className="group">
-              <div className="flex items-center gap-4 p-4 rounded-xl bg-white/70 backdrop-blur-sm border border-primary-100 hover:border-primary-300 hover:shadow-primary-lg transition-all duration-200 hover-lift">
-                <div className="w-12 h-12 bg-gradient-primary rounded-lg flex items-center justify-center shadow-primary group-hover:scale-110 transition-transform">
-                  <Plus className="h-6 w-6 text-white" />
-                </div>
-                <div>
-                  <h4 className="font-semibold text-gray-900 group-hover:text-primary-700 transition-colors">Novo Paciente</h4>
-                  <p className="text-sm text-gray-600">Cadastrar paciente</p>
-                </div>
-              </div>
-            </Link>
-            
-            <Link href="/patients" className="group">
-              <div className="flex items-center gap-4 p-4 rounded-xl bg-white/70 backdrop-blur-sm border border-secondary-100 hover:border-secondary-300 hover:shadow-secondary-lg transition-all duration-200 hover-lift">
-                <div className="w-12 h-12 bg-gradient-secondary rounded-lg flex items-center justify-center shadow-secondary group-hover:scale-110 transition-transform">
-                  <Users className="h-6 w-6 text-white" />
-                </div>
-                <div>
-                  <h4 className="font-semibold text-gray-900 group-hover:text-secondary-700 transition-colors">Ver Pacientes</h4>
-                  <p className="text-sm text-gray-600">Listar todos</p>
-                </div>
-              </div>
-            </Link>
-            
-            <Link href="/documents" className="group">
-              <div className="flex items-center gap-4 p-4 rounded-xl bg-white/70 backdrop-blur-sm border border-gray-100 hover:border-gray-300 hover:shadow-lg transition-all duration-200 hover-lift">
-                <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-blue-700 rounded-lg flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
-                  <Upload className="h-6 w-6 text-white" />
-                </div>
-                <div>
-                  <h4 className="font-semibold text-gray-900 group-hover:text-blue-700 transition-colors">Upload Documento</h4>
-                  <p className="text-sm text-gray-600">Selecionar paciente</p>
-                </div>
-              </div>
-            </Link>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Grids de atividade recente aprimorados */}
-      <div className="grid gap-8 lg:grid-cols-2">
-        {/* Pacientes recentes */}
-        <Card className="overflow-hidden bg-white/80 backdrop-blur-sm shadow-xl border-0 hover-lift transition-all duration-300">
-          <CardHeader className="bg-gradient-to-r from-primary-50 to-primary-100/50 border-b border-primary-100">
-            <CardTitle className="text-lg font-display text-gray-900 flex items-center gap-3">
-              <div className="w-10 h-10 bg-gradient-primary rounded-xl flex items-center justify-center shadow-primary">
-                <Users className="h-5 w-5 text-white" />
-              </div>
-              <span>Pacientes Recentes</span>
-              <div className="ml-auto px-3 py-1 bg-primary-100 text-primary-700 rounded-full text-xs font-medium">
-                {data.recentPatients.length}
-              </div>
-            </CardTitle>
+  if (!clinicId || !userRole) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Card className="max-w-md">
+          <CardHeader>
+            <CardTitle>Erro de Configuração</CardTitle>
+            <CardDescription>Usuário não está associado a uma clínica</CardDescription>
           </CardHeader>
-          <CardContent className="p-6">
-            {data.recentPatients.length > 0 ? (
-              <div className="space-y-4">
-                {data.recentPatients.map((patient, index) => (
-                  <div 
-                    key={patient.id} 
-                    className="group flex items-center justify-between p-4 rounded-xl bg-gradient-to-r from-gray-50 to-white border border-gray-100 hover:border-primary-200 hover:shadow-md transition-all duration-200 animate-slide-up"
-                    style={{ animationDelay: `${index * 100}ms` }}
-                  >
-                    <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 rounded-full bg-gradient-primary flex items-center justify-center shadow-primary group-hover:scale-110 transition-transform">
-                        <Users className="h-6 w-6 text-white" />
-                      </div>
-                      <div>
-                        <p className="font-semibold text-gray-900 group-hover:text-primary-700 transition-colors">
-                          {patient.fullName}
-                        </p>
-                        <p className="text-sm text-gray-600">
-                          Cadastrado em {new Date(patient.createdAt).toLocaleDateString('pt-BR')}
-                        </p>
-                      </div>
-                    </div>
-                    <Link href={`/patients/${patient.id}`}>
-                      <button className="px-4 py-2 text-sm font-medium text-primary-600 bg-primary-50 hover:bg-primary-100 rounded-lg border border-primary-200 hover:border-primary-300 transition-all duration-200 hover-lift">
-                        Ver Detalhes
-                      </button>
-                    </Link>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-12">
-                <div className="flex flex-col items-center gap-4">
-                  <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary-100 to-primary-200 flex items-center justify-center">
-                    <Users className="h-8 w-8 text-primary-600" />
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-gray-900 mb-1">Nenhum paciente ainda</h3>
-                    <p className="text-gray-600 text-sm mb-4">Comece cadastrando seu primeiro paciente</p>
-                  </div>
-                  <Link href="/patients/new">
-                    <button className="px-6 py-3 bg-gradient-primary text-white font-medium rounded-xl shadow-primary hover:shadow-primary-lg hover:-translate-y-0.5 transition-all duration-200">
-                      Cadastrar Primeiro Paciente
-                    </button>
-                  </Link>
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Consultas recentes */}
-        <Card className="overflow-hidden bg-white/80 backdrop-blur-sm shadow-xl border-0 hover-lift transition-all duration-300">
-          <CardHeader className="bg-gradient-to-r from-secondary-50 to-secondary-100/50 border-b border-secondary-100">
-            <CardTitle className="text-lg font-display text-gray-900 flex items-center gap-3">
-              <div className="w-10 h-10 bg-gradient-secondary rounded-xl flex items-center justify-center shadow-secondary">
-                <Stethoscope className="h-5 w-5 text-white" />
-              </div>
-              <span>Consultas Recentes</span>
-              <div className="ml-auto px-3 py-1 bg-secondary-100 text-secondary-700 rounded-full text-xs font-medium">
-                {data.recentConsultations.length}
-              </div>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-6">
-            {data.recentConsultations.length > 0 ? (
-              <div className="space-y-4">
-                {data.recentConsultations.map((consultation, index) => (
-                  <div 
-                    key={consultation.id} 
-                    className="group flex items-center justify-between p-4 rounded-xl bg-gradient-to-r from-gray-50 to-white border border-gray-100 hover:border-secondary-200 hover:shadow-md transition-all duration-200 animate-slide-up"
-                    style={{ animationDelay: `${index * 100}ms` }}
-                  >
-                    <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 rounded-full bg-gradient-secondary flex items-center justify-center shadow-secondary group-hover:scale-110 transition-transform">
-                        <Stethoscope className="h-6 w-6 text-white" />
-                      </div>
-                      <div>
-                        <p className="font-semibold text-gray-900 group-hover:text-secondary-700 transition-colors">
-                          {consultation.patient.fullName}
-                        </p>
-                        <p className="text-sm text-gray-600">
-                          {new Date(consultation.date).toLocaleDateString('pt-BR')}
-                        </p>
-                      </div>
-                    </div>
-                    <Link href={`/patients/${consultation.patient.id}`}>
-                      <button className="px-4 py-2 text-sm font-medium text-secondary-600 bg-secondary-50 hover:bg-secondary-100 rounded-lg border border-secondary-200 hover:border-secondary-300 transition-all duration-200 hover-lift">
-                        Ver Paciente
-                      </button>
-                    </Link>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-12">
-                <div className="flex flex-col items-center gap-4">
-                  <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-secondary-100 to-secondary-200 flex items-center justify-center">
-                    <Stethoscope className="h-8 w-8 text-secondary-600" />
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-gray-900 mb-1">Nenhuma consulta registrada</h3>
-                    <p className="text-gray-600 text-sm">As consultas aparecerão aqui quando forem adicionadas</p>
-                  </div>
-                </div>
-              </div>
-            )}
-          </CardContent>
         </Card>
       </div>
-    </div>
-  )
+    )
+  }
+
+  // Roteamento para dashboard apropriado baseado no role
+  switch (userRole) {
+    case 'ADMIN':
+      return <AdminDashboard clinicId={clinicId} />
+    case 'MANAGER':
+      return <ManagerDashboard clinicId={clinicId} />
+    case 'PHYSIOTHERAPIST':
+      return <PhysiotherapistDashboard userId={userId} clinicId={clinicId} />
+    case 'RECEPTIONIST':
+      return <ReceptionistDashboard clinicId={clinicId} />
+    default:
+      return (
+        <div className="flex items-center justify-center min-h-[400px]">
+          <Card className="max-w-md">
+            <CardHeader>
+              <CardTitle>Role Não Reconhecido</CardTitle>
+              <CardDescription>Entre em contato com o administrador</CardDescription>
+            </CardHeader>
+          </Card>
+        </div>
+      )
+  }
 }
