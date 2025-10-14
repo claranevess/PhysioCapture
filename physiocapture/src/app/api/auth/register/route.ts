@@ -21,6 +21,29 @@ export async function POST(request: Request) {
       )
     }
 
+    // Buscar ou criar clínica padrão
+    let clinic = await db.clinic.findFirst({
+      where: { name: 'Clínica Padrão' },
+    })
+
+    if (!clinic) {
+      // Criar clínica padrão se não existir
+      clinic = await db.clinic.create({
+        data: {
+          name: 'Clínica Padrão',
+          cnpj: '00.000.000/0001-00',
+          email: 'contato@clinicapadrao.com',
+          phone: '(11) 99999-9999',
+          zipCode: '00000-000',
+          street: 'Rua Exemplo',
+          number: '123',
+          neighborhood: 'Centro',
+          city: 'São Paulo',
+          state: 'SP',
+        },
+      })
+    }
+
     // Hash da senha
     const hashedPassword = await bcrypt.hash(validated.password, 12)
 
@@ -31,12 +54,16 @@ export async function POST(request: Request) {
         email: validated.email,
         password: hashedPassword,
         crm: validated.crm,
+        clinicId: clinic.id,
+        role: 'ADMIN', // Primeiro usuário é admin
       },
       select: {
         id: true,
         name: true,
         email: true,
         crm: true,
+        clinicId: true,
+        role: true,
       },
     })
 
