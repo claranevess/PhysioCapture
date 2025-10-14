@@ -42,6 +42,10 @@ export function canUploadDocument(role: UserRole): boolean {
   return true // Todos podem fazer upload
 }
 
+export function canEditDocument(role: UserRole): boolean {
+  return ['ADMIN', 'MANAGER', 'PHYSIOTHERAPIST'].includes(role)
+}
+
 export function canDeleteDocument(role: UserRole): boolean {
   return ['ADMIN', 'MANAGER'].includes(role)
 }
