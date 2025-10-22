@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { db as prisma } from '@/lib/db'
 import { deleteFileLocally } from '@/lib/local-storage'
-import { canViewAllPatients } from '@/lib/permissions'
+import { canViewAllPatients, canDeleteDocument } from '@/lib/permissions'
 
 export async function DELETE(
   request: NextRequest,
@@ -20,6 +20,14 @@ export async function DELETE(
       )
     }
 
+    //verificação pra que recepcionista e fisioterapeuta não possam deletar
+    if (!canDeleteDocument(session.user.role as any)) {
+      return NextResponse.json(
+        { error: 'Sua função não tem permissão para excluir documentos' },
+        { status: 403 } // 403 (Proibido) é o status correto
+      )
+    }
+    
     // Buscar documento e verificar permissões
     const where: any = {
       id: documentId,

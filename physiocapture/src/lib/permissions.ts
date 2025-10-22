@@ -1,5 +1,8 @@
 // Sistema de permissões baseado em roles
 
+import { db } from "@/lib/db";
+import type { Session } from 'next-auth';
+
 export type UserRole = 'ADMIN' | 'MANAGER' | 'PHYSIOTHERAPIST' | 'RECEPTIONIST'
 
 // Permissões de usuários
@@ -74,4 +77,39 @@ export function getPermissionErrorMessage(role: UserRole, action: string): strin
   }
 
   return `Seu perfil (${roleNames[role]}) não tem permissão para ${action}.`
+}
+
+type SessionUser = Session['user'];
+
+
+export async function canAccessPatientDocuments(user: SessionUser, patientId: string): Promise<boolean> {
+  // 1. Busca o paciente e garante que ele pertence à mesma clínica do usuário
+  const patient = await db.patient.findFirst({
+    where: {
+      id: patientId,
+      clinicId: user.clinicId, // Garante o isolamento de dados entre clínicas
+    },
+  });
+
+  // Se o paciente não existe ou não pertence à clínica do usuário, nega o acesso.
+  if (!patient) {
+    return false;
+  }
+
+  // ADMIN, MANAGER e RECEPTIONIST podem ver todos os pacientes da clínica.
+  if (user.role === 'ADMIN' || user.role === 'MANAGER' || user.role === 'RECEPTIONIST') {
+    return true;
+  }
+
+  // PHYSIOTHERAPIST só pode acessar pacientes que são atribuídos a ele.
+  if (user.role === 'PHYSIOTHERAPIST') {
+    return patient.assignedTherapistId === user.id;
+  }
+
+  // Nega por padrão se nenhuma regra for atendida.
+  return false;
+}
+
+export function canDeleteDocuments(user: SessionUser): boolean {
+  return user.role === 'ADMIN' || user.role === 'MANAGER';
 }
