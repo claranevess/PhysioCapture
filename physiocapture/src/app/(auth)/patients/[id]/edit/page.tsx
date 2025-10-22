@@ -49,6 +49,11 @@ export default async function EditPatientPage({ params }: EditPatientPageProps) 
     notFound()
   }
 
+  // Convert null to undefined for form compatibility
+  const initialData = Object.fromEntries(
+    Object.entries(patient).map(([key, value]) => [key, value ?? undefined])
+  )
+
   return (
     <div className="space-y-6">
       <div>
@@ -59,7 +64,7 @@ export default async function EditPatientPage({ params }: EditPatientPageProps) 
       </div>
 
       <PatientForm 
-        initialData={patient}
+        initialData={initialData}
         isEditing={true}
         patientId={patient.id}
       />

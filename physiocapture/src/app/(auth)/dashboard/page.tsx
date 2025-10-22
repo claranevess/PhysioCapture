@@ -395,7 +395,13 @@ async function ReceptionistDashboard({ clinicId }: { clinicId: string }) {
           }
         }
       }
-    }),
+    }).then(consultations => 
+      consultations.map(consultation => ({
+        ...consultation,
+        status: 'SCHEDULED' as const,
+        type: consultation.type as string
+      }))
+    ),
     db.patient.findMany({
       where: {
         clinicId,

@@ -79,10 +79,16 @@ export default async function PatientPage({ params }: PatientPageProps) {
     notFound()
   }
 
+  // Convert null to undefined for type compatibility
+  const patientData = {
+    ...patient,
+    assignedTherapist: patient.assignedTherapist || undefined
+  } as any
+
   return (
     <div className="space-y-6">
-      <PatientDashboard patient={patient} />
-      <PatientTabs patient={patient} />
+      <PatientDashboard patient={patientData} />
+      <PatientTabs patient={patientData} />
     </div>
   )
 }

@@ -1,4 +1,6 @@
 import { NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { userSchema } from '@/lib/validations/patient'
 import bcrypt from 'bcryptjs'
@@ -6,6 +8,16 @@ import { z } from 'zod'
 
 export async function POST(request: Request) {
   try {
+    const session = await getServerSession(authOptions)
+    
+    // Require authentication and admin role
+    if (!session?.user?.clinicId || session.user.role !== 'ADMIN') {
+      return NextResponse.json(
+        { error: 'Não autorizado' },
+        { status: 401 }
+      )
+    }
+
     const body = await request.json()
     const validated = userSchema.parse(body)
 
@@ -31,6 +43,7 @@ export async function POST(request: Request) {
         email: validated.email,
         password: hashedPassword,
         crm: validated.crm,
+        clinicId: session.user.clinicId,
       },
       select: {
         id: true,
