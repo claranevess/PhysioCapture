@@ -81,6 +81,13 @@ export default function DocumentsUploadPage() {
     }
   }
 
+  const handleUpdate = (updatedDocument: DocumentWithRelations) => {
+    setDocuments(prev => 
+      prev.map(doc => doc.id === updatedDocument.id ? updatedDocument : doc)
+    )
+    toast.success('Documento atualizado com sucesso!')
+  }
+
   const handleDelete = async (documentId: string) => {
     if (!confirm('Tem certeza que deseja excluir este documento?')) return
 
@@ -189,6 +196,7 @@ export default function DocumentsUploadPage() {
             documents={documents}
             onDownload={handleDownload}
             onDelete={handleDelete}
+            onUpdate={handleUpdate}
             loading={loading}
           />
         </TabsContent>

@@ -5,7 +5,7 @@ import { db } from '@/lib/db'
 
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions)
@@ -13,6 +13,8 @@ export async function PATCH(
     if (!session?.user) {
       return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
     }
+
+    const { id } = await params
 
     const clinicId = session.user.clinicId
     const role = session.user.role
@@ -29,7 +31,7 @@ export async function PATCH(
 
     // Validar que o paciente existe e pertence à clínica
     const patient = await db.patient.findUnique({
-      where: { id: params.id },
+      where: { id },
     })
 
     if (!patient || patient.clinicId !== clinicId) {
@@ -55,7 +57,7 @@ export async function PATCH(
 
     // Atualizar a atribuição
     const updatedPatient = await db.patient.update({
-      where: { id: params.id },
+      where: { id },
       data: {
         assignedTherapistId: assignedTherapistId || null,
       },
