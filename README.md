@@ -21,6 +21,20 @@ Nosso sistema foi criado para apoiar clínicas de fisioterapia e reabilitação 
 
 <img src="https://camo.githubusercontent.com/2722992d519a722218f896d5f5231d49f337aaff4514e78bd59ac935334e916a/68747470733a2f2f692e696d6775722e636f6d2f77617856496d762e706e67" width="750px" height="5px"/>
 
+## Como Abrir o Physio Capture a partir do GitHub
+### 1. Clone o repositório.
+Abra seu terminal e execute o comando:
+```bash
+git clone https://github.com/claranevess/PhysioCapture
+```
+### 2. Abra a pasta da Physio Capture na sua IDE de preferência.
+### 3. Execute a aplicação
+### 4. Após a aplicação estar rodando, abra o navegador e vá até:
+```bash
+http://localhost:3000
+```
+### 5. Na página inicial, você pode se cadastrar e acessar a plataforma conforme seu perfil de usuário.
+
 ## Tecnologias Utilizadas
 
 <div align="center">
