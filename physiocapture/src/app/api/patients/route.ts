@@ -5,6 +5,7 @@ import { db } from '@/lib/db'
 import { patientSchema } from '@/lib/validations/patient'
 import { calculateAge } from '@/lib/utils/formatters'
 import { z } from 'zod'
+import { createAuditLog } from '@/lib/audit/auditLog'
 
 // GET - Listar pacientes
 export async function GET(request: Request) {
@@ -112,23 +113,18 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     console.log('=== POST /api/patients ===')
-    
+
     const session = await getServerSession(authOptions)
-    console.log('Session:', session ? { 
-      userId: session.user?.id, 
-      userEmail: session.user?.email 
-    } : 'null')
-    
-    if (!session?.user) {
-      console.log('Usuário não autenticado')
-      return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
+    if (!session?.user?.id || !session.user.name || !session.user.role) {
+      console.log('Usuário não autenticado ou dados de sessão incompletos')
+      return NextResponse.json(
+        { error: 'Não autenticado ou dados de sessão incompletos' },
+        { status: 401 }
+      )
     }
 
     const body = await request.json()
-    console.log('Request body:', body)
-    
     const validated = patientSchema.parse(body)
-    console.log('Dados validados:', validated)
 
     // Verificar se CPF já existe
     const existingPatient = await db.patient.findUnique({
@@ -146,26 +142,19 @@ export async function POST(request: Request) {
     // Calcular idade
     const birthDate = new Date(validated.dateOfBirth)
     const age = calculateAge(birthDate)
-    console.log('Data de nascimento convertida:', birthDate)
-    console.log('Idade calculada:', age)
 
-    // Criar paciente
     const patientData = {
       ...validated,
-      dateOfBirth: birthDate, // Convert to Date object
-      cpf: validated.cpf.replace(/\D/g, ''), // Salvar CPF sem formatação
+      dateOfBirth: birthDate,
+      cpf: validated.cpf.replace(/\D/g, ''),
       age,
-      clinicId: session.user.clinicId, // Paciente pertence à clínica
-      // Lógica de atribuição:
-      // 1. Se foi fornecido assignedTherapistId no formulário, usar ele
-      // 2. Se não foi fornecido E o criador é fisioterapeuta, auto-atribuir a ele
-      // 3. Caso contrário, deixar sem atribuição (null)
-      assignedTherapistId: validated.assignedTherapistId || 
+      clinicId: session.user.clinicId,
+      assignedTherapistId:
+        validated.assignedTherapistId ||
         (session.user.role === 'PHYSIOTHERAPIST' ? session.user.id : undefined),
     }
-    
-    console.log('Dados para criar paciente:', patientData)
-    
+
+    // --- CRIAÇÃO DO PACIENTE ---
     const patient = await db.patient.create({
       data: patientData,
       include: {
@@ -184,29 +173,34 @@ export async function POST(request: Request) {
         },
       },
     })
+    // --- FIM DA CRIAÇÃO DO PACIENTE ---
+
+    // --- CRIAÇÃO DO LOG DE AUDITORIA ---
+    const logDetails = `Paciente '${patient.fullName}' (${patient.cpf}) criado.`
+    await createAuditLog({
+      userId: session.user.id,
+      userName: session.user.name,
+      userRole: session.user.role,
+      patientId: patient.id, // Usamos o ID do paciente que ACABOU de ser criado
+      action: 'CREATE_PATIENT', // Código da ação
+      details: logDetails, // Detalhes
+      entityType: 'Patient', // Tipo da entidade
+      entityId: patient.id, // ID da entidade
+    })
+    // --- FIM DA CRIAÇÃO DO LOG ---
 
     console.log('Paciente criado:', patient)
     return NextResponse.json(patient, { status: 201 })
   } catch (error) {
+    console.error('Erro no POST /api/patients:', error)
     if (error instanceof z.ZodError) {
-      console.error('Erro de validação:', error.issues)
-      return NextResponse.json({ 
-        error: error.issues,
-        message: 'Dados inválidos fornecidos'
-      }, { status: 400 })
+      return NextResponse.json(
+        { error: 'Dados inválidos', issues: error.issues },
+        { status: 400 }
+      )
     }
-    
-    console.error('Erro ao criar paciente:', {
-      error,
-      message: error instanceof Error ? error.message : 'Erro desconhecido',
-      stack: error instanceof Error ? error.stack : undefined
-    })
-    
     return NextResponse.json(
-      { 
-        error: 'Erro interno do servidor ao criar paciente',
-        message: error instanceof Error ? error.message : 'Erro desconhecido'
-      },
+      { error: 'Erro interno ao criar paciente' },
       { status: 500 }
     )
   }
