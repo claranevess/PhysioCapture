@@ -24,7 +24,7 @@ Nosso sistema foi criado para apoiar clínicas de fisioterapia e reabilitação 
 ## Tecnologias Utilizadas
 
 <div align="center">
-<br>
+
   ![Next.js](https://img.shields.io/badge/next.js-000000?style=for-the-badge&logo=nextdotjs&logoColor=white)
   ![React](https://img.shields.io/badge/-ReactJs-61DAFB?logo=react&logoColor=white&style=for-the-badge)
   ![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white)
