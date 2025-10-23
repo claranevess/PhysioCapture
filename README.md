@@ -25,7 +25,16 @@ Nosso sistema foi criado para apoiar clínicas de fisioterapia e reabilitação 
 
 <div align="center">
 <br>
-  
+  ![Next.js](https://img.shields.io/badge/next.js-000000?style=for-the-badge&logo=nextdotjs&logoColor=white)
+  ![React](https://img.shields.io/badge/-ReactJs-61DAFB?logo=react&logoColor=white&style=for-the-badge)
+  ![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white)
+  ![HTML](https://img.shields.io/badge/HTML5-FFB300?style=for-the-badge&logoColor=white)
+  ![CSS](https://img.shields.io/badge/CSS3-437312?style=for-the-badge&logoColor=white)
+  <br>
+  ![Tailwind](https://img.shields.io/badge/Tailwind_CSS-1D3C73?style=for-the-badge&logoColor=white)
+  ![Git](https://img.shields.io/badge/git-FFB300?style=for-the-badge&logoColor=white)
+  ![Figma](https://img.shields.io/badge/Figma-FFB300?style=for-the-badge&logoColor=white)
+  ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-437312?style=for-the-badge&logoColor=white)
 <br>
 </div>
 
