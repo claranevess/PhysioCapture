@@ -12,49 +12,49 @@ datasource db {
 
 // Clínica (Cliente Principal do Sistema)
 model Clinic {
-  id                String    @id @default(cuid())
-  
+  id String @id @default(cuid())
+
   // Dados da clínica
-  name              String
-  cnpj              String    @unique
-  email             String    @unique
-  phone             String
-  phoneSecondary    String?
-  
+  name           String
+  cnpj           String  @unique
+  email          String  @unique
+  phone          String
+  phoneSecondary String?
+
   // Endereço
-  zipCode           String
-  street            String
-  number            String
-  complement        String?
-  neighborhood      String
-  city              String
-  state             String
-  
+  zipCode      String
+  street       String
+  number       String
+  complement   String?
+  neighborhood String
+  city         String
+  state        String
+
   // Plano/Assinatura
-  plan              ClinicPlan  @default(BASIC)
-  planStatus        PlanStatus  @default(TRIAL)
-  maxUsers          Int         @default(5)     // Limite de usuários conforme plano
-  maxPatients       Int         @default(100)   // Limite de pacientes conforme plano
-  maxStorage        Int         @default(5)     // GB de armazenamento
-  
+  plan        ClinicPlan @default(BASIC)
+  planStatus  PlanStatus @default(TRIAL)
+  maxUsers    Int        @default(5) // Limite de usuários conforme plano
+  maxPatients Int        @default(100) // Limite de pacientes conforme plano
+  maxStorage  Int        @default(5) // GB de armazenamento
+
   // Informações administrativas
-  logo              String?     // URL do logo
-  website           String?
-  description       String?
-  
+  logo        String? // URL do logo
+  website     String?
+  description String?
+
   // Relacionamentos
-  users             User[]
-  patients          Patient[]
-  documents         Document[]
-  consultations     Consultation[]
-  
+  users         User[]
+  patients      Patient[]
+  documents     Document[]
+  consultations Consultation[]
+
   // Auditoria
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
-  subscriptionDate  DateTime  @default(now())
-  expirationDate    DateTime? // Data de expiração do plano
-  isActive          Boolean   @default(true)
-  
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  subscriptionDate DateTime  @default(now())
+  expirationDate   DateTime? // Data de expiração do plano
+  isActive         Boolean   @default(true)
+
   @@index([cnpj])
   @@index([isActive])
   @@map("clinics")
@@ -62,34 +62,34 @@ model Clinic {
 
 // Usuário (Profissionais da Clínica)
 model User {
-  id            String    @id @default(cuid())
-  email         String    @unique
-  password      String    // Hash bcrypt
-  name          String
-  role          UserRole  @default(PHYSIOTHERAPIST)
-  
+  id       String   @id @default(cuid())
+  email    String   @unique
+  password String // Hash bcrypt
+  name     String
+  role     UserRole @default(PHYSIOTHERAPIST)
+
   // Dados profissionais
-  crm           String?   // Registro no conselho (para fisioterapeutas)
-  cpf           String?   @unique
-  phone         String?
-  
+  crm   String? // Registro no conselho (para fisioterapeutas)
+  cpf   String? @unique
+  phone String?
+
   // Vínculo com a clínica
-  clinicId      String
-  clinic        Clinic    @relation(fields: [clinicId], references: [id], onDelete: Cascade)
-  
+  clinicId String
+  clinic   Clinic @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+
   // Status
-  isActive      Boolean   @default(true)
-  
+  isActive Boolean @default(true)
+
   // Relacionamentos
-  assignedPatients   Patient[]     @relation("AssignedTherapist")
-  consultations      Consultation[]
-  documentsUploaded  Document[]
-  
+  assignedPatients  Patient[]      @relation("AssignedTherapist")
+  consultations     Consultation[]
+  documentsUploaded Document[]
+
   // Auditoria
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  lastLoginAt   DateTime?
-  
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  lastLoginAt DateTime?
+
   @@index([clinicId])
   @@index([email])
   @@index([role])
@@ -98,63 +98,64 @@ model User {
 
 // Paciente
 model Patient {
-  id                  String    @id @default(cuid())
-  
+  id String @id @default(cuid())
+
   // Dados pessoais
-  fullName            String
-  cpf                 String    @unique
-  dateOfBirth         DateTime
-  age                 Int       // Calculado automaticamente
-  phone               String
-  phoneSecondary      String?
-  email               String?
-  
+  fullName       String
+  cpf            String   @unique
+  dateOfBirth    DateTime
+  age            Int // Calculado automaticamente
+  phone          String
+  phoneSecondary String?
+  email          String?
+
   // Endereço
-  zipCode             String?
-  street              String?
-  number              String?
-  complement          String?
-  neighborhood        String?
-  city                String?
-  state               String?
-  
+  zipCode      String?
+  street       String?
+  number       String?
+  complement   String?
+  neighborhood String?
+  city         String?
+  state        String?
+
   // Profissional/Convênio
-  occupation          String?
-  insurance           String?
-  insuranceNumber     String?
-  
+  occupation      String?
+  insurance       String?
+  insuranceNumber String?
+
   // Status
-  status              PatientStatus @default(ACTIVE)
-  
+  status PatientStatus @default(ACTIVE)
+
   // Observações gerais
-  generalNotes        String?
-  
+  generalNotes String?
+
   // Anamnese
-  chiefComplaint      String?
-  currentIllness      String?
-  medicalHistory      String?
-  medications         String?
-  allergies           String?
-  lifestyle           String?
-  physicalAssessment  String?
-  
+  chiefComplaint     String?
+  currentIllness     String?
+  medicalHistory     String?
+  medications        String?
+  allergies          String?
+  lifestyle          String?
+  physicalAssessment String?
+
   // Vínculo com a clínica
-  clinicId            String
-  clinic              Clinic    @relation(fields: [clinicId], references: [id], onDelete: Cascade)
-  
+  clinicId String
+  clinic   Clinic @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+
   // Fisioterapeuta responsável
   assignedTherapistId String?
-  assignedTherapist   User?     @relation("AssignedTherapist", fields: [assignedTherapistId], references: [id])
-  
+  assignedTherapist   User?   @relation("AssignedTherapist", fields: [assignedTherapistId], references: [id])
+
   // Relacionamentos
-  consultations       Consultation[]
-  documents           Document[]
-  
+  consultations Consultation[]
+  documents     Document[]
+  auditLogs     AuditLog[] // Indica que um Paciente pode ter vários AuditLogs
+
   // Auditoria
-  createdAt           DateTime  @default(now())
-  updatedAt           DateTime  @updatedAt
-  lastVisitDate       DateTime?
-  
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  lastVisitDate DateTime?
+
   @@index([clinicId])
   @@index([assignedTherapistId])
   @@index([cpf])
@@ -165,37 +166,37 @@ model Patient {
 
 // Consulta/Evolução
 model Consultation {
-  id                  String   @id @default(cuid())
-  
-  date                DateTime @default(now())
-  type                ConsultationType
-  
+  id String @id @default(cuid())
+
+  date DateTime         @default(now())
+  type ConsultationType
+
   // SOAP (Subjetivo, Objetivo, Avaliação, Plano)
-  subjective          String? // Queixas do paciente
-  objective           String? // Avaliação objetiva/exame físico
-  assessment          String? // Avaliação/impressão clínica
-  plan                String? // Conduta/tratamento
-  
-  exercises           String? // Exercícios prescritos
-  nextVisit           DateTime? // Próxima consulta sugerida
-  notes               String? // Observações gerais
-  
+  subjective String? // Queixas do paciente
+  objective  String? // Avaliação objetiva/exame físico
+  assessment String? // Avaliação/impressão clínica
+  plan       String? // Conduta/tratamento
+
+  exercises String? // Exercícios prescritos
+  nextVisit DateTime? // Próxima consulta sugerida
+  notes     String? // Observações gerais
+
   // Vínculo com a clínica
-  clinicId            String
-  clinic              Clinic   @relation(fields: [clinicId], references: [id], onDelete: Cascade)
-  
+  clinicId String
+  clinic   Clinic @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+
   // Relacionamentos
-  patientId           String
-  patient             Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
-  
-  performedBy         String   // ID do fisioterapeuta que realizou
-  performer           User     @relation(fields: [performedBy], references: [id])
-  
+  patientId String
+  patient   Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  performedBy String // ID do fisioterapeuta que realizou
+  performer   User   @relation(fields: [performedBy], references: [id])
+
   // Auditoria
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
-  canEdit             Boolean  @default(true) // Apenas 24h após criação
-  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  canEdit   Boolean  @default(true) // Apenas 24h após criação
+
   @@index([clinicId])
   @@index([patientId])
   @@index([performedBy])
@@ -205,28 +206,28 @@ model Consultation {
 
 // Documento
 model Document {
-  id          String   @id @default(cuid())
-  fileName    String   // Nome original do arquivo
-  fileUrl     String   // URL do arquivo no storage
-  fileSize    Int      // Tamanho em bytes
-  mimeType    String   // image/jpeg, application/pdf, etc
+  id          String           @id @default(cuid())
+  fileName    String // Nome original do arquivo
+  fileUrl     String // URL do arquivo no storage
+  fileSize    Int // Tamanho em bytes
+  mimeType    String // image/jpeg, application/pdf, etc
   category    DocumentCategory
-  title       String?  // Título customizado
-  description String?  // Notas/descrição
-  
+  title       String? // Título customizado
+  description String? // Notas/descrição
+
   // Vínculo com a clínica
-  clinicId    String
-  clinic      Clinic   @relation(fields: [clinicId], references: [id], onDelete: Cascade)
-  
-  patientId   String
-  patient     Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
-  
-  uploadedBy  String   // ID do usuário que fez upload
-  uploader    User     @relation(fields: [uploadedBy], references: [id])
-  
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
+  clinicId String
+  clinic   Clinic @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+
+  patientId String
+  patient   Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  uploadedBy String // ID do usuário que fez upload
+  uploader   User   @relation(fields: [uploadedBy], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   @@index([clinicId])
   @@index([patientId])
   @@index([category])
@@ -236,38 +237,38 @@ model Document {
 
 // Enums
 enum UserRole {
-  ADMIN               // Administrador da clínica (acesso total)
-  MANAGER             // Gestor (relatórios, configurações)
-  PHYSIOTHERAPIST     // Fisioterapeuta (atendimento)
-  RECEPTIONIST        // Recepcionista (cadastros, agendamento)
+  ADMIN // Administrador da clínica (acesso total)
+  MANAGER // Gestor (relatórios, configurações)
+  PHYSIOTHERAPIST // Fisioterapeuta (atendimento)
+  RECEPTIONIST // Recepcionista (cadastros, agendamento)
 }
 
 enum ClinicPlan {
-  BASIC               // Plano Básico
-  PROFESSIONAL        // Plano Profissional
-  ENTERPRISE          // Plano Enterprise
+  BASIC // Plano Básico
+  PROFESSIONAL // Plano Profissional
+  ENTERPRISE // Plano Enterprise
 }
 
 enum PlanStatus {
-  TRIAL               // Período de teste
-  ACTIVE              // Ativo
-  SUSPENDED           // Suspenso (pagamento pendente)
-  CANCELLED           // Cancelado
+  TRIAL // Período de teste
+  ACTIVE // Ativo
+  SUSPENDED // Suspenso (pagamento pendente)
+  CANCELLED // Cancelado
 }
 
 enum PatientStatus {
-  ACTIVE              // Em tratamento
-  INACTIVE            // Inativo
-  EVALUATION          // Em avaliação
-  DISCHARGED          // Alta
+  ACTIVE // Em tratamento
+  INACTIVE // Inativo
+  EVALUATION // Em avaliação
+  DISCHARGED // Alta
 }
 
 enum ConsultationType {
-  INITIAL_EVALUATION  // Avaliação inicial
-  REASSESSMENT        // Reavaliação
-  TREATMENT_SESSION   // Sessão de tratamento
-  DISCHARGE           // Alta
-  RETURN              // Retorno
+  INITIAL_EVALUATION // Avaliação inicial
+  REASSESSMENT // Reavaliação
+  TREATMENT_SESSION // Sessão de tratamento
+  DISCHARGE // Alta
+  RETURN // Retorno
 }
 
 enum DocumentCategory {
@@ -279,4 +280,27 @@ enum DocumentCategory {
   ANAMNESE
   RELATORIO_EVOLUCAO
   OUTROS
+}
+
+// Modelo para registrar o histórico de alterações
+model AuditLog {
+  id        String   @id @default(cuid()) // Identificador único do log
+  timestamp DateTime @default(now()) // Data e hora exata da alteração
+
+  userId   String // ID do usuário que fez a ação
+  userName String // Nome do usuário (para exibição)
+  userRole UserRole // Role do usuário no momento da ação
+
+  patientId String // ID do paciente relacionado
+  patient   Patient @relation(fields: [patientId], references: [id], onDelete: Cascade) // Relacionamento com o Paciente
+
+  action     String // Tipo de ação (ex: UPDATE_PATIENT, UPLOAD_DOCUMENT)
+  entityType String? // Opcional: Tipo da entidade alterada (Patient, Consultation, Document)
+  entityId   String? // Opcional: ID da entidade específica alterada
+
+  details String // Descrição textual da alteração
+
+  @@index([patientId, timestamp]) // Índice para buscar histórico por paciente rapidamente
+  @@index([userId]) // Índice para buscar por usuário
+  @@map("audit_logs") // Nome da tabela no banco de dados
 }
