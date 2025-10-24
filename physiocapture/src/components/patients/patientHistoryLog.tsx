@@ -1,57 +1,82 @@
 // Onde colar: src/components/patients/PatientHistoryLog.tsx
 
-// Necessário para componentes com interatividade (hooks como useState, useEffect)
 'use client'
 
-// --- 1. Importações ---
 import React, { useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { AlertCircle, History } from 'lucide-react' // Ícones
-import { LoadingSpinner } from '@/components/ui/loading-spinner' // Componente de loading
+import { AlertCircle, History } from 'lucide-react'
+import { LoadingSpinner } from '@/components/ui/loading-spinner'
+import { Button } from '@/components/ui/button' // NOVO: Importar Button para "Tentar Novamente"
 
-// --- 2. Definição do Tipo de Log (Como esperamos receber da API) ---
-// Baseado no contrato que definimos para a API GET /api/patients/[id]/history
+// Interface AuditLogEntry (continua igual)
 interface AuditLogEntry {
   id: string;
-  timestamp: string; // Vem como string ISO da API
+  timestamp: string;
   userName: string;
-  userRole: string; // Poderia ser UserRole se importássemos do @prisma/client
+  userRole: string;
   action: string;
   details: string;
   entityType?: string | null;
   entityId?: string | null;
 }
 
-// --- 3. Propriedades do Componente ---
-// O componente precisa saber de qual paciente buscar o histórico
+// Interface PatientHistoryLogProps (continua igual)
 interface PatientHistoryLogProps {
   patientId: string;
 }
 
-// --- 4. O Componente Principal ---
 export function PatientHistoryLog({ patientId }: PatientHistoryLogProps) {
-  // --- 5. Estados do Componente ---
-  // Para guardar a lista de logs recebida da API
+  // Estados (continuam iguais)
   const [logs, setLogs] = useState<AuditLogEntry[]>([])
-  // Para indicar se estamos buscando os dados
-  const [loading, setLoading] = useState<boolean>(true) // Começa como true, pois vamos buscar logo ao carregar
-  // Para guardar qualquer erro que ocorra na busca
+  const [loading, setLoading] = useState<boolean>(true)
   const [error, setError] = useState<string | null>(null)
-  // Para guardar informações de paginação (começaremos simples, depois adicionamos)
   const [currentPage, setCurrentPage] = useState<number>(1)
   const [totalPages, setTotalPages] = useState<number>(1)
 
-  // --- 6. Lógica de Busca (Será implementada na Etapa 2) ---
-  // Por enquanto, apenas um placeholder
-  useEffect(() => {
-    // TODO: Buscar dados da API /api/patients/[patientId]/history aqui
-    console.log("Componente PatientHistoryLog montado para paciente:", patientId)
-    // Simulando o fim do carregamento (removeremos isso depois)
-    setTimeout(() => setLoading(false), 1000);
-  }, [patientId, currentPage]) // A busca será refeita se o patientId ou a página mudar
+  // --- NOVO: Função para buscar os dados ---
+  const fetchHistory = async (pageToFetch: number) => {
+    setLoading(true) // Ativa o loading
+    setError(null)   // Limpa erros anteriores
 
-  // --- 7. Renderização Condicional ---
-  // Mostra o spinner enquanto 'loading' for true
+    try {
+      // Monta a URL da API, incluindo os parâmetros de paginação
+      const apiUrl = `/api/patients/${patientId}/history?page=${pageToFetch}&limit=20`
+      console.log("Buscando histórico em:", apiUrl) // Log para debug
+
+      const response = await fetch(apiUrl)
+      const data = await response.json()
+
+      if (!response.ok) {
+        // Se a API retornar um erro, lança uma exceção
+        throw new Error(data.error || 'Falha ao buscar o histórico')
+      }
+
+      // Atualiza os estados com os dados recebidos
+      setLogs(data.data || []) // Atualiza a lista de logs
+      setCurrentPage(data.pagination.page) // Atualiza a página atual
+      setTotalPages(data.pagination.totalPages) // Atualiza o total de páginas
+
+    } catch (err) {
+      // Se ocorrer um erro (na rede ou lançado acima), atualiza o estado de erro
+      console.error("Erro ao buscar histórico:", err)
+      const errorMessage = err instanceof Error ? err.message : 'Ocorreu um erro desconhecido'
+      setError(errorMessage)
+      setLogs([]) // Limpa os logs em caso de erro
+
+    } finally {
+      // Independentemente de sucesso ou erro, desativa o loading
+      setLoading(false)
+    }
+  }
+
+  // --- useEffect modificado ---
+  // Agora ele chama a função fetchHistory
+  useEffect(() => {
+    // Busca os dados da página atual sempre que patientId ou currentPage mudar
+    fetchHistory(currentPage)
+  }, [patientId, currentPage]) // Dependências do useEffect
+
+  // --- Renderização Condicional (Loading) - Continua igual ---
   if (loading) {
     return (
       <Card>
@@ -68,7 +93,7 @@ export function PatientHistoryLog({ patientId }: PatientHistoryLogProps) {
     )
   }
 
-  // Mostra uma mensagem de erro se 'error' tiver algum valor
+  // --- Renderização Condicional (Error) - Modificada com botão ---
   if (error) {
     return (
       <Card className="border-red-200 bg-red-50">
@@ -78,16 +103,21 @@ export function PatientHistoryLog({ patientId }: PatientHistoryLogProps) {
             Erro ao Carregar Histórico
           </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
           <p className="text-red-600">{error}</p>
-          {/* TODO: Adicionar um botão de "Tentar Novamente" */}
+          {/* NOVO: Botão para tentar buscar novamente */}
+          <Button
+            variant="destructive"
+            onClick={() => fetchHistory(currentPage)} // Chama a busca novamente
+          >
+            Tentar Novamente
+          </Button>
         </CardContent>
       </Card>
     )
   }
 
-  // --- 8. Renderização Principal (Será implementada na Etapa 3) ---
-  // Se não está carregando e não deu erro, mostra a lista (por enquanto, vazia)
+  // --- Renderização Principal (Ainda com placeholder) ---
   return (
     <Card>
       <CardHeader>
@@ -97,7 +127,7 @@ export function PatientHistoryLog({ patientId }: PatientHistoryLogProps) {
         </CardTitle>
       </CardHeader>
       <CardContent>
-        {/* TODO: Renderizar a lista de logs aqui */}
+        {/* TODO: Renderizar a lista de logs aqui (Etapa 3) */}
         {logs.length === 0 ? (
            <p className="text-muted-foreground text-center py-10">Nenhuma alteração registrada para este paciente ainda.</p>
         ) : (
