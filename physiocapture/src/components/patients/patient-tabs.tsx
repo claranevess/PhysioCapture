@@ -284,11 +284,11 @@ export function PatientTabs({ patient }: PatientTabsProps) {
       <TabsContent value="anamnesis">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle>Anamnese</CardTitle>
+            <CardTitle>Prontuário / Anamnese</CardTitle>
             <Button variant="outline" asChild>
-              <Link href={`/patients/${patient.id}/edit`}>
+              <Link href={`/patients/${patient.id}/medical-record/edit`}>
                 <Edit className="h-4 w-4 mr-2" />
-                Editar Anamnese
+                Editar Prontuário
               </Link>
             </Button>
           </CardHeader>
@@ -314,7 +314,7 @@ export function PatientTabs({ patient }: PatientTabsProps) {
 
               {patient.medicalHistory && (
                 <div>
-                  <h4 className="font-medium mb-2">História Médica Pregressa</h4>
+                  <h4 className="font-medium mb-2">Histórico Médico</h4>
                   <p className="text-sm text-muted-foreground whitespace-pre-wrap">
                     {patient.medicalHistory}
                   </p>
@@ -362,14 +362,14 @@ export function PatientTabs({ patient }: PatientTabsProps) {
                !patient.physicalAssessment && (
                 <div className="text-center py-12">
                   <ClipboardList className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                  <h3 className="font-medium mb-2">Anamnese não preenchida</h3>
+                  <h3 className="font-medium mb-2">Prontuário não preenchido</h3>
                   <p className="text-muted-foreground mb-4">
-                    Complete a anamnese com as informações médicas do paciente.
+                    Complete o prontuário com o histórico médico e anamnese do paciente.
                   </p>
                   <Button asChild>
-                    <Link href={`/patients/${patient.id}/anamnesis/edit`}>
+                    <Link href={`/patients/${patient.id}/medical-record/new`}>
                       <Edit className="h-4 w-4 mr-2" />
-                      Preencher Anamnese
+                      Preencher Prontuário
                     </Link>
                   </Button>
                 </div>

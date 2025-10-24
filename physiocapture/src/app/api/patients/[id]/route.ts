@@ -140,41 +140,76 @@ export async function PATCH(
     const body = await request.json()
     console.log('Request body:', body)
     
-    const validated = patientSchema.parse(body)
-    console.log('Dados validados:', validated)
+    // Separar dados do paciente e dados do prontuário (anamnese)
+    const medicalRecordFields = [
+      'chiefComplaint',
+      'currentIllness', 
+      'medicalHistory',
+      'medications',
+      'allergies',
+      'lifestyle',
+      'physicalAssessment',
+      'generalNotes'
+    ]
+    
+    // Validar apenas se campos obrigatórios de paciente foram enviados
+    // ou se é apenas atualização de prontuário
+    const isOnlyMedicalRecordUpdate = Object.keys(body).every(key => 
+      medicalRecordFields.includes(key)
+    )
+    
+    let validated
+    if (isOnlyMedicalRecordUpdate) {
+      // Validação simplificada para atualização apenas de prontuário
+      validated = body
+    } else {
+      // Validação completa do schema de paciente
+      validated = patientSchema.parse(body)
+      
+      // Verificar se CPF já existe (excluindo o próprio paciente)
+      if (validated.cpf !== existingPatient.cpf) {
+        const cpfExists = await db.patient.findFirst({
+          where: {
+            cpf: validated.cpf.replace(/\D/g, ''),
+            id: { not: id },
+          },
+        })
 
-    // Verificar se CPF já existe (excluindo o próprio paciente)
-    if (validated.cpf !== existingPatient.cpf) {
-      const cpfExists = await db.patient.findFirst({
-        where: {
-          cpf: validated.cpf.replace(/\D/g, ''),
-          id: { not: id },
-        },
-      })
-
-      if (cpfExists) {
-        return NextResponse.json(
-          { error: 'Este CPF já está cadastrado no sistema' },
-          { status: 400 }
-        )
+        if (cpfExists) {
+          return NextResponse.json(
+            { error: 'Este CPF já está cadastrado no sistema' },
+            { status: 400 }
+          )
+        }
       }
     }
+    
+    console.log('Dados validados:', validated)
 
-    // Calcular idade
-    const birthDate = new Date(validated.dateOfBirth)
-    const age = calculateAge(birthDate)
-    console.log('Data de nascimento convertida:', birthDate)
-    console.log('Idade calculada:', age)
+    // Calcular idade apenas se dateOfBirth foi fornecido
+    let updateData: any = { ...validated }
+    
+    if (!isOnlyMedicalRecordUpdate && validated.dateOfBirth) {
+      const birthDate = new Date(validated.dateOfBirth)
+      const age = calculateAge(birthDate)
+      console.log('Data de nascimento convertida:', birthDate)
+      console.log('Idade calculada:', age)
+      
+      updateData = {
+        ...validated,
+        dateOfBirth: birthDate,
+        cpf: validated.cpf.replace(/\D/g, ''),
+        age,
+      }
+    } else if (isOnlyMedicalRecordUpdate) {
+      // Para atualização apenas de prontuário, não modificar campos de data e CPF
+      updateData = validated
+    }
 
     // Atualizar paciente
     const patient = await db.patient.update({
       where: { id },
-      data: {
-        ...validated,
-        dateOfBirth: birthDate, // Convert to Date object
-        cpf: validated.cpf.replace(/\D/g, ''),
-        age,
-      },
+      data: updateData,
       include: {
         _count: {
           select: {
