@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { db } from '@/lib/db'
-import { patientSchema } from '@/lib/validations/patient'
+import { patientSchema, updatePatientSchema } from '@/lib/validations/patient'
 import { calculateAge } from '@/lib/utils/formatters'
 import { z } from 'zod'
 import { createAuditLog } from '@/lib/audit/auditLog'
@@ -123,7 +123,7 @@ export async function PATCH(
     }
 
     const body = await request.json()
-    const validated = patientSchema.parse(body)
+    const validated = updatePatientSchema.parse(body)
 
     // Verificar se CPF já existe (excluindo o próprio paciente)
     if (
@@ -147,6 +147,9 @@ export async function PATCH(
       }
     }
 
+    if (!validated.dateOfBirth) {
+      throw new Error('Data de nascimento é obrigatória')
+    }
     const birthDate = new Date(validated.dateOfBirth)
     const age = calculateAge(birthDate)
 
@@ -201,14 +204,21 @@ export async function PATCH(
     }
     // --- FIM DA PREPARAÇÃO PARA O LOG ---
 
+    // NOVO: Prepara os dados para atualização, processando apenas o que foi enviado
+    const dataToUpdate: any = { ...validated }
+
+    if (validated.dateOfBirth) {
+      dataToUpdate.dateOfBirth = new Date(validated.dateOfBirth)
+      dataToUpdate.age = calculateAge(dataToUpdate.dateOfBirth)
+    }
+
+    if (validated.cpf) {
+      dataToUpdate.cpf = validated.cpf.replace(/\D/g, '')
+    }
+
     const updatedPatient = await db.patient.update({
       where: { id: patientId },
-      data: {
-        ...validated,
-        dateOfBirth: birthDate,
-        cpf: validated.cpf.replace(/\D/g, ''),
-        age,
-      },
+      data: dataToUpdate,
       include: {
         _count: {
           select: {

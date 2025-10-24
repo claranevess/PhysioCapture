@@ -96,6 +96,15 @@ export const patientSchema = z.object({
   physicalAssessment: z.string().or(z.literal('')).optional(),
 })
 
+// Schema para atualização - torna todos os campos opcionais, mas mantém validação quando presente
+export const updatePatientSchema = patientSchema.partial().extend({
+  // CPF opcional na atualização, mas quando fornecido deve ser válido
+  cpf: z
+    .string()
+    .refine(validateCPF, 'CPF inválido')
+    .optional(),
+})
+
 export const consultationSchema = z.object({
   date: z.string().or(z.date()),
   type: z.enum(['INITIAL_EVALUATION', 'REASSESSMENT', 'TREATMENT_SESSION', 'DISCHARGE', 'RETURN']),

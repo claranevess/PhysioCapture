@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { patientSchema, type PatientFormData } from '@/lib/validations/patient'
+import { patientSchema, updatePatientSchema, type PatientFormData } from '@/lib/validations/patient'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -34,6 +34,9 @@ export function PatientForm({ initialData, isEditing = false, patientId }: Patie
     Object.entries(initialData).map(([key, value]) => [key, value === null ? '' : value])
   ) as Partial<PatientFormData> : undefined
 
+  // Usar o schema correto baseado no modo (criação ou edição)
+  const validationSchema = isEditing ? updatePatientSchema : patientSchema
+
   const {
     register,
     handleSubmit,
@@ -42,8 +45,8 @@ export function PatientForm({ initialData, isEditing = false, patientId }: Patie
     watch,
     setError,
     clearErrors,
-  } = useForm<PatientFormData>({
-    resolver: zodResolver(patientSchema),
+  } = useForm<Partial<PatientFormData>>({
+    resolver: zodResolver(validationSchema) as any,
     defaultValues: processedInitialData,
   })
 
@@ -144,7 +147,7 @@ export function PatientForm({ initialData, isEditing = false, patientId }: Patie
     }
   }
 
-  const onSubmit = async (data: PatientFormData) => {
+  const onSubmit = async (data: Partial<PatientFormData>) => {
     setLoading(true)
 
     try {
@@ -157,34 +160,38 @@ export function PatientForm({ initialData, isEditing = false, patientId }: Patie
           key,
           value === '' ? undefined : value
         ])
-      ) as PatientFormData
+      ) as Partial<PatientFormData>
 
       console.log('Dados limpos:', cleanedData)
 
-      // Validar se campos obrigatórios estão presentes
-      if (!cleanedData.fullName || cleanedData.fullName.trim().length < 3) {
-        throw new Error('Nome completo é obrigatório e deve ter pelo menos 3 caracteres')
+      // Validar se campos obrigatórios estão presentes (apenas para criação)
+      if (!isEditing) {
+        if (!cleanedData.fullName || cleanedData.fullName.trim().length < 3) {
+          throw new Error('Nome completo é obrigatório e deve ter pelo menos 3 caracteres')
+        }
+        
+        if (!cleanedData.cpf) {
+          throw new Error('CPF é obrigatório')
+        }
+        
+        if (!cleanedData.dateOfBirth) {
+          throw new Error('Data de nascimento é obrigatória')
+        }
+        
+        if (!cleanedData.phone) {
+          throw new Error('Telefone é obrigatório')
+        }
       }
       
-      if (!cleanedData.cpf) {
-        throw new Error('CPF é obrigatório')
-      }
-      
-      if (!cleanedData.dateOfBirth) {
-        throw new Error('Data de nascimento é obrigatória')
-      }
-      
-      // Validate and format date
-      const birthDate = new Date(cleanedData.dateOfBirth)
-      if (isNaN(birthDate.getTime())) {
-        throw new Error('Data de nascimento inválida')
-      }
-      
-      // Ensure date is in ISO format for API
-      cleanedData.dateOfBirth = birthDate.toISOString().split('T')[0] // YYYY-MM-DD format
-      
-      if (!cleanedData.phone) {
-        throw new Error('Telefone é obrigatório')
+      // Validate and format date if present
+      if (cleanedData.dateOfBirth) {
+        const birthDate = new Date(cleanedData.dateOfBirth)
+        if (isNaN(birthDate.getTime())) {
+          throw new Error('Data de nascimento inválida')
+        }
+        
+        // Ensure date is in ISO format for API
+        cleanedData.dateOfBirth = birthDate.toISOString().split('T')[0] as any // YYYY-MM-DD format
       }
 
       const url = isEditing ? `/api/patients/${patientId}` : '/api/patients'
