@@ -255,15 +255,18 @@ export async function DELETE(
 ) {
   try {
     const session = await getServerSession(authOptions)
-    if (!session?.user) {
-      return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
+    if (!session?.user?.id || !session.user.name || !session.user.role) {
+      return NextResponse.json(
+        { error: 'Não autenticado ou dados de sessão incompletos' },
+        { status: 401 }
+      )
     }
 
-    const { id } = await params
+    const { id: patientId } = await params
 
     // Construir where - Admin e Manager podem deletar qualquer paciente da clínica
     const where: any = {
-      id,
+      id: patientId,
       clinicId: session.user.clinicId,
     }
 
@@ -287,29 +290,42 @@ export async function DELETE(
 
     if (!existingPatient) {
       return NextResponse.json(
-        { error: 'Paciente não encontrado ou você não tem permissão para excluí-lo' },
+        {
+          error:
+            'Paciente não encontrado ou você não tem permissão para excluí-lo',
+        },
         { status: 404 }
       )
     }
 
-    // Excluir paciente (cascade irá remover consultas e documentos)
+    // --- PREPARAÇÃO DOS DETALHES DO LOG (ANTES DE DELETAR) ---
+    const logDetails = `Paciente '${existingPatient.fullName}' (${existingPatient.cpf}) excluído.`
+    // --- FIM DA PREPARAÇÃO ---
+
+    // --- EXCLUSÃO DO PACIENTE ---
     await db.patient.delete({
-      where: { id },
+      where: { id: patientId },
     })
+    // --- FIM DA EXCLUSÃO ---
+
+    // --- CRIAÇÃO DO LOG DE AUDITORIA ---
+    await createAuditLog({
+      userId: session.user.id,
+      userName: session.user.name,
+      userRole: session.user.role,
+      patientId: patientId, // ID do paciente que foi excluído
+      action: 'DELETE_PATIENT', // Código da ação
+      details: logDetails, // Detalhes que preparamos antes
+      entityType: 'Patient', // Tipo da entidade
+      entityId: patientId, // ID da entidade
+    })
+    // --- FIM DA CRIAÇÃO DO LOG ---
 
     return NextResponse.json({ message: 'Paciente excluído com sucesso' })
   } catch (error) {
-    console.error('Erro ao excluir paciente:', {
-      error,
-      message: error instanceof Error ? error.message : 'Erro desconhecido',
-      stack: error instanceof Error ? error.stack : undefined
-    })
-    
+    console.error('Erro no DELETE /api/patients/[id]:', error)
     return NextResponse.json(
-      { 
-        error: 'Erro interno do servidor ao excluir paciente',
-        message: error instanceof Error ? error.message : 'Erro desconhecido'
-      },
+      { error: 'Erro interno ao excluir paciente' },
       { status: 500 }
     )
   }
