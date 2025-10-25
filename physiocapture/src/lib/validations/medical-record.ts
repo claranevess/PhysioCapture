@@ -54,9 +54,9 @@ export const medicalRecordSchema = z.object({
     .optional()
     .or(z.literal('')),
 
-  // Observações Gerais (campo existente no modelo)
-  generalNotes: z.string()
-    .max(2000, 'Observações gerais devem ter no máximo 2000 caracteres')
+  // Observações Clínicas (campo do MedicalRecord)
+  clinicalNotes: z.string()
+    .max(2000, 'Observações clínicas devem ter no máximo 2000 caracteres')
     .optional()
     .or(z.literal('')),
 })

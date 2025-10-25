@@ -37,7 +37,7 @@ export function MedicalRecordForm({ patientId, patientName, initialData }: Medic
       allergies: initialData?.allergies || '',
       lifestyle: initialData?.lifestyle || '',
       physicalAssessment: initialData?.physicalAssessment || '',
-      generalNotes: initialData?.generalNotes || '',
+      clinicalNotes: initialData?.clinicalNotes || '',
     },
   })
 
@@ -55,8 +55,8 @@ export function MedicalRecordForm({ patientId, patientName, initialData }: Medic
         Object.entries(data).filter(([_, value]) => value && value.trim() !== '')
       )
 
-      const response = await fetch(`/api/patients/${patientId}`, {
-        method: 'PATCH',
+      const response = await fetch(`/api/medical-records/${patientId}`, {
+        method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(cleanedData),
       })
@@ -315,13 +315,13 @@ export function MedicalRecordForm({ patientId, patientName, initialData }: Medic
         <CardContent>
           <div className="space-y-2">
             <Textarea
-              {...register('generalNotes')}
+              {...register('clinicalNotes')}
               placeholder="Ex: Paciente ansioso em relação ao tratamento. Expectativas de retorno ao esporte em 2 meses. Necessita acompanhamento psicológico..."
               rows={4}
-              className={errors.generalNotes ? 'border-red-500' : ''}
+              className={errors.clinicalNotes ? 'border-red-500' : ''}
             />
-            {errors.generalNotes && (
-              <p className="text-sm text-red-500">{errors.generalNotes.message}</p>
+            {errors.clinicalNotes && (
+              <p className="text-sm text-red-500">{errors.clinicalNotes.message}</p>
             )}
           </div>
         </CardContent>

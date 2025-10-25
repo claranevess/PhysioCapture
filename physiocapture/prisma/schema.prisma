@@ -47,6 +47,7 @@ model Clinic {
   patients          Patient[]
   documents         Document[]
   consultations     Consultation[]
+  medicalRecords    MedicalRecord[]
   
   // Auditoria
   createdAt         DateTime  @default(now())
@@ -129,15 +130,6 @@ model Patient {
   // Observações gerais
   generalNotes        String?
   
-  // Anamnese
-  chiefComplaint      String?
-  currentIllness      String?
-  medicalHistory      String?
-  medications         String?
-  allergies           String?
-  lifestyle           String?
-  physicalAssessment  String?
-  
   // Vínculo com a clínica
   clinicId            String
   clinic              Clinic    @relation(fields: [clinicId], references: [id], onDelete: Cascade)
@@ -149,6 +141,7 @@ model Patient {
   // Relacionamentos
   consultations       Consultation[]
   documents           Document[]
+  medicalRecord       MedicalRecord?
   
   // Auditoria
   createdAt           DateTime  @default(now())
@@ -201,6 +194,40 @@ model Consultation {
   @@index([performedBy])
   @@index([date])
   @@map("consultations")
+}
+
+// Prontuário Médico
+model MedicalRecord {
+  id                  String   @id @default(cuid())
+  
+  // Vínculo 1:1 com paciente
+  patientId           String   @unique
+  patient             Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  
+  // Vínculo com a clínica
+  clinicId            String
+  clinic              Clinic   @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  
+  // Anamnese
+  chiefComplaint      String?  // Queixa principal
+  currentIllness      String?  // História da doença atual
+  medicalHistory      String?  // Histórico médico
+  medications         String?  // Medicamentos em uso
+  allergies           String?  // Alergias
+  lifestyle           String?  // Hábitos de vida
+  physicalAssessment  String?  // Avaliação física inicial
+  
+  // Observações clínicas
+  clinicalNotes       String?  // Observações gerais do prontuário
+  
+  // Auditoria
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  lastUpdatedBy       String?  // ID do usuário que fez a última atualização
+  
+  @@index([clinicId])
+  @@index([patientId])
+  @@map("medical_records")
 }
 
 // Documento

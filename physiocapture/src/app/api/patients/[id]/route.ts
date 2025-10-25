@@ -40,6 +40,7 @@ export async function GET(
             crm: true,
           },
         },
+        medicalRecord: true, // ← Incluir prontuário
         consultations: {
           orderBy: { date: 'desc' },
           take: 10,
@@ -149,11 +150,10 @@ export async function PATCH(
       'allergies',
       'lifestyle',
       'physicalAssessment',
-      'generalNotes'
+      'clinicalNotes'
     ]
     
-    // Validar apenas se campos obrigatórios de paciente foram enviados
-    // ou se é apenas atualização de prontuário
+    // Verificar se é apenas atualização de prontuário
     const isOnlyMedicalRecordUpdate = Object.keys(body).every(key => 
       medicalRecordFields.includes(key)
     )
@@ -211,6 +211,7 @@ export async function PATCH(
       where: { id },
       data: updateData,
       include: {
+        medicalRecord: true, // ← Incluir prontuário na resposta
         _count: {
           select: {
             consultations: true,
