@@ -15,11 +15,13 @@ import { medicalRecordSchema, type MedicalRecordFormData } from '@/lib/validatio
 
 interface MedicalRecordFormProps {
   patientId: string
-  patientName: string
+  patientName?: string
   initialData?: Partial<MedicalRecordFormData>
+  // adiciona onSaved opcional que o Tab espera
+  onSaved?: (data?: Partial<MedicalRecordFormData>) => void
 }
 
-export function MedicalRecordForm({ patientId, patientName, initialData }: MedicalRecordFormProps) {
+export function MedicalRecordForm({ patientId, patientName, initialData, onSaved }: MedicalRecordFormProps) {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
 
@@ -66,7 +68,10 @@ export function MedicalRecordForm({ patientId, patientName, initialData }: Medic
         throw new Error(errorData.error || 'Erro ao salvar prontuário')
       }
 
+      const saved = await response.json()
       toast.success('Prontuário atualizado com sucesso!')
+      // chama callback opcional passado pelo parent
+      onSaved?.(saved)
       router.push(`/patients/${patientId}`)
       router.refresh()
     } catch (error) {
@@ -74,6 +79,24 @@ export function MedicalRecordForm({ patientId, patientName, initialData }: Medic
       toast.error(error instanceof Error ? error.message : 'Erro ao salvar prontuário')
     } finally {
       setLoading(false)
+    }
+  }
+
+  // manter caso queira chamada direta; usa onSaved também
+  const handleSave = async (data: MedicalRecordFormData) => {
+    const res = await fetch(`/api/medical-records/${patientId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+      headers: { 'Content-Type': 'application/json' },
+    })
+
+    if (res.ok) {
+      const saved = await res.json()
+      onSaved?.(saved)
+    } else {
+      // trata erro...
+      const err = await res.json().catch(() => ({ error: 'Erro' }))
+      toast.error(err.error || 'Erro ao salvar')
     }
   }
 
