@@ -49,6 +49,8 @@ http://localhost:3000
   ![Git](https://img.shields.io/badge/git-000000?style=for-the-badge&logoColor=white)
   ![Figma](https://img.shields.io/badge/Figma-FD3D39?style=for-the-badge&logoColor=white)
   ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-2965F1?style=for-the-badge&logoColor=white)
+  ![Vercel](https://img.shields.io/badge/Vercel-000000?style=for-the-badge&logo=vercel&logoColor=white)
+  ![Railway](https://img.shields.io/badge/Railway-131415?style=for-the-badge&logo=railway&logoColor=white)
 <br>
 </div>
 
