@@ -57,7 +57,7 @@ http://localhost:3000
 <img src="https://camo.githubusercontent.com/2722992d519a722218f896d5f5231d49f337aaff4514e78bd59ac935334e916a/68747470733a2f2f692e696d6775722e636f6d2f77617856496d762e706e67" width="750px" height="5px"/>
 
 ## Equipe
-- Maria Clara Neves (mcsan@cesar.school) <a href="www.linkedin.com.br/in/claranevess" target="_blank"><img src="https://skillicons.dev/icons?i=linkedin" alt="LinkedIn" height="30"/></a>
-- Matheus Veríssimo (mmv@cesar.school) <a href="https://www.linkedin.com/in/matheus-martins-8696422b8/" target="_blank"><img src="https://skillicons.dev/icons?i=linkedin" alt="LinkedIn" height="30"/></a>
-- Vinícius Bernardo (vbs4@cesar.school) <a href="https://www.linkedin.com/in/vin%C3%ADcius-bernardo-805193326/" target="_blank"><img src="https://skillicons.dev/icons?i=linkedin" alt="LinkedIn" height="30"/></a>
-- Vinícius Marques (vjmm@cesar.school) <a href="https://www.linkedin.com/in/vin%C3%ADcius-marques-2109ads/" target="_blank"><img src="https://skillicons.dev/icons?i=linkedin" alt="LinkedIn" height="30"/></a>
+- Maria Clara Neves <a href="mailto:mcsan@cesar.school" target="_blank"><img src="https://skillicons.dev/icons?i=gmail" alt="LinkedIn" height="30"/></a> <a href="www.linkedin.com.br/in/claranevess" target="_blank"><img src="https://skillicons.dev/icons?i=linkedin" alt="LinkedIn" height="30"/></a>
+- Matheus Veríssimo <a href="mailto:mmv@cesar.school" target="_blank"><img src="https://skillicons.dev/icons?i=gmail" alt="LinkedIn" height="30"/></a> <a href="https://www.linkedin.com/in/matheus-martins-8696422b8/" target="_blank"><img src="https://skillicons.dev/icons?i=linkedin" alt="LinkedIn" height="30"/></a>
+- Vinícius Bernardo <a href="mailto:vbs4@cesar.school" target="_blank"><img src="https://skillicons.dev/icons?i=gmail" alt="LinkedIn" height="30"/></a> <a href="https://www.linkedin.com/in/vin%C3%ADcius-bernardo-805193326/" target="_blank"><img src="https://skillicons.dev/icons?i=linkedin" alt="LinkedIn" height="30"/></a>
+- Vinícius Marques <a href="mailto:vjmm@cesar.school" target="_blank"><img src="https://skillicons.dev/icons?i=gmail" alt="LinkedIn" height="30"/></a> <a href="https://www.linkedin.com/in/vin%C3%ADcius-marques-2109ads/" target="_blank"><img src="https://skillicons.dev/icons?i=linkedin" alt="LinkedIn" height="30"/></a>
