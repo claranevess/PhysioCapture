@@ -39,7 +39,7 @@ class DocumentAccessLogSerializer(serializers.ModelSerializer):
 
 class DocumentSerializer(serializers.ModelSerializer):
     """
-    Serializer completo para documentos
+    Serializer completo para documentos com OCR
     """
     patient_name = serializers.CharField(source='patient.full_name', read_only=True)
     category_name = serializers.CharField(source='category.name', read_only=True)
@@ -49,6 +49,7 @@ class DocumentSerializer(serializers.ModelSerializer):
     access_level_display = serializers.CharField(source='get_access_level_display', read_only=True)
     file_size_formatted = serializers.CharField(read_only=True)
     file_url = serializers.SerializerMethodField()
+    thumbnail_url = serializers.SerializerMethodField()
     access_logs = DocumentAccessLogSerializer(many=True, read_only=True)
     
     class Meta:
@@ -57,6 +58,8 @@ class DocumentSerializer(serializers.ModelSerializer):
             'id', 'patient', 'patient_name', 'category', 'category_name',
             'title', 'description', 'document_type', 'document_type_display',
             'file', 'file_url', 'file_size', 'file_size_formatted', 'file_extension',
+            'thumbnail', 'thumbnail_url',
+            'ocr_text', 'ocr_confidence', 'ocr_processed', 'ocr_language',
             'access_level', 'access_level_display', 'allowed_users',
             'document_date', 'tags',
             'created_at', 'updated_at',
@@ -64,7 +67,10 @@ class DocumentSerializer(serializers.ModelSerializer):
             'last_modified_by', 'last_modified_by_name',
             'is_active', 'is_verified', 'access_logs'
         ]
-        read_only_fields = ['file_size', 'file_extension', 'created_at', 'updated_at', 'uploaded_by']
+        read_only_fields = [
+            'file_size', 'file_extension', 'created_at', 'updated_at', 
+            'uploaded_by', 'ocr_text', 'ocr_confidence', 'ocr_processed', 'thumbnail'
+        ]
     
     def get_file_url(self, obj):
         """
@@ -76,24 +82,37 @@ class DocumentSerializer(serializers.ModelSerializer):
                 return request.build_absolute_uri(obj.file.url)
             return obj.file.url
         return None
+    
+    def get_thumbnail_url(self, obj):
+        """
+        Retorna a URL completa da thumbnail
+        """
+        if obj.thumbnail:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.thumbnail.url)
+            return obj.thumbnail.url
+        return None
 
 
 class DocumentListSerializer(serializers.ModelSerializer):
     """
-    Serializer resumido para listagem de documentos
+    Serializer resumido para listagem de documentos (otimizado para mobile)
     """
     patient_name = serializers.CharField(source='patient.full_name', read_only=True)
     category_name = serializers.CharField(source='category.name', read_only=True)
     document_type_display = serializers.CharField(source='get_document_type_display', read_only=True)
     file_size_formatted = serializers.CharField(read_only=True)
     file_url = serializers.SerializerMethodField()
+    thumbnail_url = serializers.SerializerMethodField()
     
     class Meta:
         model = Document
         fields = [
             'id', 'patient', 'patient_name', 'category', 'category_name',
             'title', 'document_type', 'document_type_display',
-            'file_url', 'file_size_formatted',
+            'file_url', 'thumbnail_url', 'file_size_formatted',
+            'ocr_processed', 'ocr_confidence',
             'created_at', 'is_verified'
         ]
     
@@ -103,6 +122,14 @@ class DocumentListSerializer(serializers.ModelSerializer):
             if request:
                 return request.build_absolute_uri(obj.file.url)
             return obj.file.url
+        return None
+    
+    def get_thumbnail_url(self, obj):
+        if obj.thumbnail:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.thumbnail.url)
+            return obj.thumbnail.url
         return None
 
 

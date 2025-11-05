@@ -154,12 +154,30 @@ CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:3000",
 ]
 
+# Permitir cookies/credenciais (opcional, desabilitado por enquanto)
+CORS_ALLOW_CREDENTIALS = False
+
+# Permitir todos os headers
+CORS_ALLOW_ALL_ORIGINS = False  # False em produção!
+CORS_ALLOW_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+]
+
 # --- Configuração do Django REST Framework ---
 REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': [
-        'rest_framework.permissions.IsAuthenticated',
+        'rest_framework.permissions.AllowAny',  # Alterado para desenvolvimento
     ],
     'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
         'rest_framework.authentication.SessionAuthentication',
     ],
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
@@ -169,3 +187,38 @@ REST_FRAMEWORK = {
         'rest_framework.filters.OrderingFilter',
     ],
 }
+
+# --- JWT Configuration ---
+from datetime import timedelta
+
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(days=1),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
+    'ROTATE_REFRESH_TOKENS': False,
+    'BLACKLIST_AFTER_ROTATION': False,
+    'UPDATE_LAST_LOGIN': True,
+    'ALGORITHM': 'HS256',
+    'SIGNING_KEY': SECRET_KEY,
+    'AUTH_HEADER_TYPES': ('Bearer',),
+    'AUTH_HEADER_NAME': 'HTTP_AUTHORIZATION',
+    'USER_ID_FIELD': 'id',
+    'USER_ID_CLAIM': 'user_id',
+}
+
+# --- File Upload Settings ---
+# Max upload size: 50MB
+DATA_UPLOAD_MAX_MEMORY_SIZE = 52428800  # 50 MB
+FILE_UPLOAD_MAX_MEMORY_SIZE = 52428800  # 50 MB
+
+# Allowed file extensions for documents
+ALLOWED_DOCUMENT_EXTENSIONS = [
+    'pdf', 'jpg', 'jpeg', 'png', 'gif', 'bmp', 'tiff',
+    'doc', 'docx', 'xls', 'xlsx', 'txt'
+]
+
+# Tesseract OCR Configuration (Windows)
+# Ajuste o caminho se necessário
+TESSERACT_CMD = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
+
+# OCR Languages
+OCR_LANGUAGES = 'por+eng'  # Português e Inglês

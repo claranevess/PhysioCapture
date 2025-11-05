@@ -42,6 +42,10 @@ class Document(models.Model):
         ('IMAGE', 'Imagem'),
         ('DOC', 'Documento Word'),
         ('EXCEL', 'Planilha Excel'),
+        ('FICHA', 'Ficha de Avaliação'),
+        ('EXAME', 'Exame'),
+        ('ATESTADO', 'Atestado'),
+        ('RECEITA', 'Receita'),
         ('OTHER', 'Outro'),
     ]
 
@@ -64,6 +68,15 @@ class Document(models.Model):
     file = models.FileField(upload_to=document_upload_path, verbose_name="Arquivo")
     file_size = models.IntegerField(blank=True, null=True, verbose_name="Tamanho do Arquivo (bytes)")
     file_extension = models.CharField(max_length=10, blank=True, null=True, verbose_name="Extensão")
+    
+    # OCR - Texto extraído (NOVO - Feature principal H01)
+    ocr_text = models.TextField(blank=True, null=True, verbose_name="Texto Extraído (OCR)")
+    ocr_confidence = models.FloatField(blank=True, null=True, verbose_name="Confiança do OCR (%)")
+    ocr_processed = models.BooleanField(default=False, verbose_name="OCR Processado")
+    ocr_language = models.CharField(max_length=10, default='por', verbose_name="Idioma OCR")
+    
+    # Thumbnail para preview mobile
+    thumbnail = models.ImageField(upload_to='documents/thumbnails/', blank=True, null=True, verbose_name="Miniatura")
     
     # Segurança e controle de acesso
     access_level = models.CharField(max_length=15, choices=ACCESS_LEVEL_CHOICES, default='RESTRICTED', verbose_name="Nível de Acesso")
@@ -107,6 +120,8 @@ class Document(models.Model):
         if self.file:
             if os.path.isfile(self.file.path):
                 os.remove(self.file.path)
+        if self.thumbnail and os.path.isfile(self.thumbnail.path):
+            os.remove(self.thumbnail.path)
         super().delete(*args, **kwargs)
 
     @property

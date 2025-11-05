@@ -1,7 +1,7 @@
 from rest_framework import viewsets, status, filters
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from django.db.models import Q
 from .models import Patient, MedicalRecord, MedicalRecordHistory
 from .serializers import (
@@ -24,7 +24,7 @@ class PatientViewSet(viewsets.ModelViewSet):
     - GET /api/prontuario/patients/{id}/medical_records/ - Prontuários do paciente
     """
     queryset = Patient.objects.all()
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]  # Temporário para desenvolvimento
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ['full_name', 'cpf', 'email', 'phone']
     ordering_fields = ['full_name', 'created_at', 'birth_date']
@@ -46,7 +46,11 @@ class PatientViewSet(viewsets.ModelViewSet):
         return queryset
     
     def perform_create(self, serializer):
-        serializer.save(created_by=self.request.user)
+        # Temporário: verificar se há usuário autenticado
+        if self.request.user.is_authenticated:
+            serializer.save(created_by=self.request.user)
+        else:
+            serializer.save()
     
     @action(detail=True, methods=['get'])
     def medical_records(self, request, pk=None):
@@ -95,7 +99,7 @@ class MedicalRecordViewSet(viewsets.ModelViewSet):
     - GET /api/prontuario/medical-records/{id}/history/ - Histórico de alterações
     """
     queryset = MedicalRecord.objects.all()
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]  # Temporário para desenvolvimento
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ['title', 'patient__full_name', 'diagnosis', 'chief_complaint']
     ordering_fields = ['record_date', 'created_at', 'patient__full_name']
@@ -127,21 +131,29 @@ class MedicalRecordViewSet(viewsets.ModelViewSet):
         """
         Cria um novo prontuário e registra no histórico
         """
-        record = serializer.save(created_by=self.request.user)
-        
-        # Criar registro no histórico
-        MedicalRecordHistory.objects.create(
-            medical_record=record,
-            action='CREATE',
-            user=self.request.user,
-            ip_address=self.get_client_ip(),
-            user_agent=self.request.META.get('HTTP_USER_AGENT', '')
-        )
+        # Temporário: verificar se há usuário autenticado
+        if self.request.user.is_authenticated:
+            record = serializer.save(created_by=self.request.user)
+            
+            # Criar registro no histórico
+            MedicalRecordHistory.objects.create(
+                medical_record=record,
+                action='CREATE',
+                user=self.request.user,
+                ip_address=self.get_client_ip(),
+                user_agent=self.request.META.get('HTTP_USER_AGENT', '')
+            )
+        else:
+            record = serializer.save()
     
     def perform_update(self, serializer):
         """
         Atualiza um prontuário e registra as alterações no histórico
         """
+        if not self.request.user.is_authenticated:
+            serializer.save()
+            return
+            
         # Capturar dados anteriores
         instance = self.get_object()
         previous_data = {
@@ -183,18 +195,19 @@ class MedicalRecordViewSet(viewsets.ModelViewSet):
         """
         Remove um prontuário e registra no histórico
         """
-        # Criar registro no histórico antes de deletar
-        MedicalRecordHistory.objects.create(
-            medical_record=instance,
-            action='DELETE',
-            previous_data={
-                'title': instance.title,
-                'patient': instance.patient.full_name,
-            },
-            user=self.request.user,
-            ip_address=self.get_client_ip(),
-            user_agent=self.request.META.get('HTTP_USER_AGENT', '')
-        )
+        # Criar registro no histórico antes de deletar (se autenticado)
+        if self.request.user.is_authenticated:
+            MedicalRecordHistory.objects.create(
+                medical_record=instance,
+                action='DELETE',
+                previous_data={
+                    'title': instance.title,
+                    'patient': instance.patient.full_name,
+                },
+                user=self.request.user,
+                ip_address=self.get_client_ip(),
+                user_agent=self.request.META.get('HTTP_USER_AGENT', '')
+            )
         instance.delete()
     
     @action(detail=True, methods=['get'])

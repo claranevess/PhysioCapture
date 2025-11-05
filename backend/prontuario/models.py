@@ -3,6 +3,11 @@ from django.contrib.auth.models import User
 from django.utils import timezone
 
 
+def patient_photo_upload_path(instance, filename):
+    """Define o caminho de upload das fotos dos pacientes"""
+    return f'patients/photos/{instance.id}/{filename}'
+
+
 class Patient(models.Model):
     """
     Modelo para armazenar informações dos pacientes
@@ -19,26 +24,40 @@ class Patient(models.Model):
     birth_date = models.DateField(verbose_name="Data de Nascimento")
     gender = models.CharField(max_length=1, choices=GENDER_CHOICES, verbose_name="Gênero")
     
+    # Foto do paciente (NOVO - Mobile-first)
+    photo = models.ImageField(
+        upload_to=patient_photo_upload_path, 
+        blank=True, 
+        null=True, 
+        verbose_name="Foto"
+    )
+    
     # Contato
     phone = models.CharField(max_length=20, verbose_name="Telefone")
     email = models.EmailField(blank=True, null=True, verbose_name="E-mail")
     
     # Endereço
-    address = models.CharField(max_length=300, verbose_name="Endereço")
-    city = models.CharField(max_length=100, verbose_name="Cidade")
-    state = models.CharField(max_length=2, verbose_name="Estado")
-    zip_code = models.CharField(max_length=10, verbose_name="CEP")
+    address = models.CharField(max_length=300, blank=True, verbose_name="Endereço")
+    city = models.CharField(max_length=100, blank=True, verbose_name="Cidade")
+    state = models.CharField(max_length=2, blank=True, verbose_name="Estado")
+    zip_code = models.CharField(max_length=10, blank=True, verbose_name="CEP")
     
-    # Informações médicas básicas
+    # Informações médicas básicas (NOVO - Prontuário inicial)
+    chief_complaint = models.TextField(blank=True, null=True, verbose_name="Queixa Principal")
     blood_type = models.CharField(max_length=3, blank=True, null=True, verbose_name="Tipo Sanguíneo")
     allergies = models.TextField(blank=True, null=True, verbose_name="Alergias")
     medications = models.TextField(blank=True, null=True, verbose_name="Medicações em Uso")
+    medical_history = models.TextField(blank=True, null=True, verbose_name="Histórico Médico")
     
     # Controle
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="Criado em")
     updated_at = models.DateTimeField(auto_now=True, verbose_name="Atualizado em")
     created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='patients_created', verbose_name="Criado por")
     is_active = models.BooleanField(default=True, verbose_name="Ativo")
+    
+    # Metadados úteis para mobile
+    last_visit = models.DateTimeField(blank=True, null=True, verbose_name="Última Visita")
+    notes = models.TextField(blank=True, null=True, verbose_name="Observações Gerais")
 
     class Meta:
         ordering = ['full_name']
@@ -47,6 +66,15 @@ class Patient(models.Model):
 
     def __str__(self):
         return f"{self.full_name} - CPF: {self.cpf}"
+    
+    @property
+    def age(self):
+        """Calcula a idade do paciente"""
+        from datetime import date
+        today = date.today()
+        return today.year - self.birth_date.year - (
+            (today.month, today.day) < (self.birth_date.month, self.birth_date.day)
+        )
 
 
 class MedicalRecord(models.Model):

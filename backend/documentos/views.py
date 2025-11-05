@@ -1,7 +1,7 @@
 from rest_framework import viewsets, status, filters
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.parsers import MultiPartParser, FormParser
 from django.db.models import Q
 from django.http import FileResponse, Http404
@@ -27,7 +27,7 @@ class DocumentCategoryViewSet(viewsets.ModelViewSet):
     """
     queryset = DocumentCategory.objects.all()
     serializer_class = DocumentCategorySerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]  # Temporário para desenvolvimento
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ['name', 'description']
     ordering_fields = ['name', 'created_at']
@@ -57,7 +57,7 @@ class DocumentViewSet(viewsets.ModelViewSet):
     - GET /api/documentos/documents/{id}/access_logs/ - Logs de acesso
     """
     queryset = Document.objects.all()
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]  # Temporário para desenvolvimento
     parser_classes = [MultiPartParser, FormParser]
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ['title', 'description', 'patient__full_name', 'tags']
