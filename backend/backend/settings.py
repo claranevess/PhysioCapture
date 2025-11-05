@@ -38,6 +38,9 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'corsheaders',  # <-- Adicionado para o CORS
+    'rest_framework',  # Django REST Framework
+    'prontuario',  # App de prontuários
+    'documentos',  # App de documentos
 ]
 
 MIDDLEWARE = [
@@ -75,16 +78,25 @@ WSGI_APPLICATION = 'backend.wsgi.application'
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
 # --- Bloco de Banco de Dados MODIFICADO ---
+# Usando SQLite para desenvolvimento/testes (mais fácil de configurar)
 DATABASES = {
     'default': {
-        'ENGINE': 'mysql.connector.django',  # O engine que instalamos
-        'NAME': 'physiocapture',             # O nome do seu banco
-        'USER': 'physiocapture',             # O nome do seu usuário
-        'PASSWORD': 'SUA_SENHA_AQUI',      # <-- COLOQUE A SENHA QUE VOCÊ CRIOU
-        'HOST': 'localhost',                 # O servidor
-        'PORT': '3306',                      # A porta
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': BASE_DIR / 'db.sqlite3',
     }
 }
+
+# Para usar MySQL, descomente abaixo e configure a senha:
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'django.db.backends.mysql',
+#         'NAME': 'physiocapture',
+#         'USER': 'physiocapture',
+#         'PASSWORD': 'SUA_SENHA_AQUI',  # <-- COLOQUE A SENHA QUE VOCÊ CRIOU
+#         'HOST': 'localhost',
+#         'PORT': '3306',
+#     }
+# }
 # --- Fim do Bloco Modificado ---
 
 
@@ -123,6 +135,11 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
 STATIC_URL = 'static/'
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+
+# Media files (Uploads)
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
@@ -136,3 +153,19 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",  # A porta padrão do Next.js
     "http://127.0.0.1:3000",
 ]
+
+# --- Configuração do Django REST Framework ---
+REST_FRAMEWORK = {
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticated',
+    ],
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework.authentication.SessionAuthentication',
+    ],
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    'PAGE_SIZE': 20,
+    'DEFAULT_FILTER_BACKENDS': [
+        'rest_framework.filters.SearchFilter',
+        'rest_framework.filters.OrderingFilter',
+    ],
+}
