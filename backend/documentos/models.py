@@ -1,5 +1,5 @@
 from django.db import models
-from django.contrib.auth.models import User
+from django.conf import settings
 from prontuario.models import Patient
 import os
 
@@ -80,7 +80,7 @@ class Document(models.Model):
     
     # Segurança e controle de acesso
     access_level = models.CharField(max_length=15, choices=ACCESS_LEVEL_CHOICES, default='RESTRICTED', verbose_name="Nível de Acesso")
-    allowed_users = models.ManyToManyField(User, blank=True, related_name='allowed_documents', verbose_name="Usuários Permitidos")
+    allowed_users = models.ManyToManyField(settings.AUTH_USER_MODEL, blank=True, related_name='allowed_documents', verbose_name="Usuários Permitidos")
     
     # Metadados
     document_date = models.DateField(blank=True, null=True, verbose_name="Data do Documento")
@@ -89,8 +89,8 @@ class Document(models.Model):
     # Controle
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="Criado em")
     updated_at = models.DateTimeField(auto_now=True, verbose_name="Atualizado em")
-    uploaded_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='documents_uploaded', verbose_name="Enviado por")
-    last_modified_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='documents_modified', verbose_name="Última modificação por")
+    uploaded_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name='documents_uploaded', verbose_name="Enviado por")
+    last_modified_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name='documents_modified', verbose_name="Última modificação por")
     
     # Status
     is_active = models.BooleanField(default=True, verbose_name="Ativo")
@@ -152,7 +152,7 @@ class DocumentAccessLog(models.Model):
     ]
 
     document = models.ForeignKey(Document, on_delete=models.CASCADE, related_name='access_logs', verbose_name="Documento")
-    user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, verbose_name="Usuário")
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, verbose_name="Usuário")
     action = models.CharField(max_length=10, choices=ACTION_CHOICES, verbose_name="Ação")
     
     # Informações de auditoria

@@ -39,6 +39,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'corsheaders',  # <-- Adicionado para o CORS
     'rest_framework',  # Django REST Framework
+    'authentication',  # App de autenticação
     'prontuario',  # App de prontuários
     'documentos',  # App de documentos
 ]
@@ -146,6 +147,9 @@ MEDIA_ROOT = BASE_DIR / 'media'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+# Custom User Model
+AUTH_USER_MODEL = 'authentication.User'
+
 
 # --- Configuração do CORS Adicionada ---
 # Define quais origens (seu frontend) podem se conectar
@@ -154,8 +158,8 @@ CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:3000",
 ]
 
-# Permitir cookies/credenciais (opcional, desabilitado por enquanto)
-CORS_ALLOW_CREDENTIALS = False
+# Permitir cookies/credenciais (habilitado para sessões)
+CORS_ALLOW_CREDENTIALS = True
 
 # Permitir todos os headers
 CORS_ALLOW_ALL_ORIGINS = False  # False em produção!

@@ -1,16 +1,21 @@
 from django.db import models
-from django.contrib.auth.models import User
+from django.conf import settings
 from django.utils import timezone
 
 
 def patient_photo_upload_path(instance, filename):
     """Define o caminho de upload das fotos dos pacientes"""
-    return f'patients/photos/{instance.id}/{filename}'
+    return f'patients/photos/{instance.clinica_id}/{instance.id}/{filename}'
 
 
 class Patient(models.Model):
     """
-    Modelo para armazenar informações dos pacientes
+    REGISTRO DE PACIENTE - NÃO É UM USUÁRIO!
+    
+    Pacientes não fazem login no sistema.
+    São apenas registros de dados (como uma "ficha").
+    Criados e gerenciados por Fisioterapeutas.
+    Pertencem a uma Clínica (Tenant).
     """
     GENDER_CHOICES = [
         ('M', 'Masculino'),
@@ -18,9 +23,26 @@ class Patient(models.Model):
         ('O', 'Outro'),
     ]
 
+    # TENANT - Paciente pertence a uma clínica
+    clinica = models.ForeignKey(
+        'authentication.Clinica',
+        on_delete=models.CASCADE,
+        related_name='pacientes',
+        verbose_name='Clínica'
+    )
+    
+    # FISIOTERAPEUTA RESPONSÁVEL - Quem criou e gerencia este paciente
+    fisioterapeuta = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name='meus_pacientes',
+        verbose_name='Fisioterapeuta Responsável',
+        help_text='Fisioterapeuta que criou e gerencia este paciente'
+    )
+    
     # Dados pessoais
     full_name = models.CharField(max_length=200, verbose_name="Nome Completo")
-    cpf = models.CharField(max_length=14, unique=True, verbose_name="CPF")
+    cpf = models.CharField(max_length=14, verbose_name="CPF")
     birth_date = models.DateField(verbose_name="Data de Nascimento")
     gender = models.CharField(max_length=1, choices=GENDER_CHOICES, verbose_name="Gênero")
     
@@ -52,7 +74,6 @@ class Patient(models.Model):
     # Controle
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="Criado em")
     updated_at = models.DateTimeField(auto_now=True, verbose_name="Atualizado em")
-    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='patients_created', verbose_name="Criado por")
     is_active = models.BooleanField(default=True, verbose_name="Ativo")
     
     # Metadados úteis para mobile
@@ -63,9 +84,11 @@ class Patient(models.Model):
         ordering = ['full_name']
         verbose_name = "Paciente"
         verbose_name_plural = "Pacientes"
+        # CPF único por clínica (um paciente não pode estar duplicado na mesma clínica)
+        unique_together = [['clinica', 'cpf']]
 
     def __str__(self):
-        return f"{self.full_name} - CPF: {self.cpf}"
+        return f"{self.full_name} - CPF: {self.cpf} ({self.clinica.nome})"
     
     @property
     def age(self):
@@ -107,8 +130,8 @@ class MedicalRecord(models.Model):
     record_date = models.DateTimeField(default=timezone.now, verbose_name="Data do Registro")
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="Criado em")
     updated_at = models.DateTimeField(auto_now=True, verbose_name="Atualizado em")
-    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='records_created', verbose_name="Criado por")
-    last_modified_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='records_modified', verbose_name="Última modificação por")
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name='records_created', verbose_name="Criado por")
+    last_modified_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name='records_modified', verbose_name="Última modificação por")
 
     class Meta:
         ordering = ['-record_date']
@@ -140,7 +163,7 @@ class MedicalRecordHistory(models.Model):
     
     # Controle
     timestamp = models.DateTimeField(auto_now_add=True, verbose_name="Data/Hora")
-    user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, verbose_name="Usuário")
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, verbose_name="Usuário")
     ip_address = models.GenericIPAddressField(blank=True, null=True, verbose_name="Endereço IP")
     user_agent = models.TextField(blank=True, null=True, verbose_name="User Agent")
 

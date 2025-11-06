@@ -1,8 +1,11 @@
 from rest_framework import viewsets, status, filters
-from rest_framework.decorators import action
+from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
-from django.db.models import Q
+from django.db.models import Q, Count, F
+from django.db.models.functions import TruncDate, TruncWeek, TruncMonth
+from django.utils import timezone
+from datetime import timedelta, datetime
 from .models import Patient, MedicalRecord, MedicalRecordHistory
 from .serializers import (
     PatientSerializer, PatientListSerializer,
@@ -231,3 +234,157 @@ class MedicalRecordViewSet(viewsets.ModelViewSet):
             ip = self.request.META.get('REMOTE_ADDR')
         return ip
 
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def dashboard_statistics(request):
+    """
+    Endpoint para retornar estatísticas do dashboard
+    GET /api/prontuario/dashboard-stats/
+    """
+    today = timezone.now().date()
+    week_ago = today - timedelta(days=7)
+    month_ago = today - timedelta(days=30)
+    last_month_start = today - timedelta(days=60)
+    
+    # Total de pacientes
+    total_patients = Patient.objects.filter(is_active=True).count()
+    
+    # Pacientes criados esta semana
+    patients_this_week = Patient.objects.filter(
+        created_at__gte=timezone.now() - timedelta(days=7)
+    ).count()
+    
+    # Pacientes criados semana passada
+    patients_last_week = Patient.objects.filter(
+        created_at__gte=timezone.now() - timedelta(days=14),
+        created_at__lt=timezone.now() - timedelta(days=7)
+    ).count()
+    
+    # Crescimento semanal
+    if patients_last_week > 0:
+        weekly_growth = ((patients_this_week - patients_last_week) / patients_last_week) * 100
+    else:
+        weekly_growth = 100 if patients_this_week > 0 else 0
+    
+    # Prontuários ativos (criados nos últimos 30 dias)
+    active_records = MedicalRecord.objects.filter(
+        record_date__gte=timezone.now() - timedelta(days=30)
+    ).count()
+    
+    # Documentos hoje (prontuários criados hoje)
+    documents_today = MedicalRecord.objects.filter(
+        created_at__date=today
+    ).count()
+    
+    # Receita mensal estimada (R$ 150 por paciente ativo)
+    monthly_revenue = total_patients * 150
+    
+    # Crescimento mensal
+    patients_this_month = Patient.objects.filter(
+        created_at__gte=timezone.now() - timedelta(days=30)
+    ).count()
+    patients_last_month = Patient.objects.filter(
+        created_at__gte=timezone.now() - timedelta(days=60),
+        created_at__lt=timezone.now() - timedelta(days=30)
+    ).count()
+    
+    if patients_last_month > 0:
+        monthly_growth = ((patients_this_month - patients_last_month) / patients_last_month) * 100
+    else:
+        monthly_growth = 100 if patients_this_month > 0 else 0
+    
+    # Dados semanais (últimos 7 dias)
+    weekly_data = []
+    days_pt = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
+    
+    for i in range(6, -1, -1):
+        day = today - timedelta(days=i)
+        day_name = days_pt[day.weekday()]
+        
+        patients_count = Patient.objects.filter(created_at__date=day).count()
+        records_count = MedicalRecord.objects.filter(record_date__date=day).count()
+        consultations = MedicalRecord.objects.filter(
+            record_date__date=day,
+            record_type='CONSULTA'
+        ).count()
+        
+        weekly_data.append({
+            'day': day_name,
+            'pacientes': patients_count,
+            'consultas': consultations,
+            'documentos': records_count
+        })
+    
+    # Tendência mensal (últimos 8 meses)
+    monthly_trend = []
+    months_pt = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
+    
+    for i in range(7, -1, -1):
+        month_date = today - timedelta(days=30 * i)
+        month_start = month_date.replace(day=1)
+        if month_date.month == 12:
+            month_end = month_date.replace(year=month_date.year + 1, month=1, day=1) - timedelta(days=1)
+        else:
+            month_end = month_date.replace(month=month_date.month + 1, day=1) - timedelta(days=1)
+        
+        patients_in_month = Patient.objects.filter(
+            created_at__date__gte=month_start,
+            created_at__date__lte=month_end
+        ).count()
+        
+        monthly_trend.append({
+            'month': months_pt[month_date.month - 1],
+            'value': patients_in_month
+        })
+    
+    # Distribuição de serviços (por tipo de prontuário)
+    service_distribution = []
+    record_types = MedicalRecord.objects.values('record_type').annotate(
+        count=Count('id')
+    ).order_by('-count')
+    
+    total_records = MedicalRecord.objects.count()
+    
+    if total_records > 0:
+        # Mapear tipos para nomes mais amigáveis
+        type_mapping = {
+            'CONSULTA': 'Consultas',
+            'AVALIACAO': 'Avaliações',
+            'EVOLUCAO': 'Evoluções',
+            'PROCEDIMENTO': 'Procedimentos',
+            'EXAME': 'Exames',
+            'DIAGNOSTICO': 'Diagnósticos',
+            'OUTROS': 'Outros'
+        }
+        
+        colors = ['#009688', '#66BB6A', '#FF8099', '#BA68C8', '#FFC107', '#2196F3', '#FF9800']
+        
+        for idx, item in enumerate(record_types[:7]):
+            percentage = (item['count'] / total_records) * 100
+            service_distribution.append({
+                'name': type_mapping.get(item['record_type'], item['record_type']),
+                'value': round(percentage, 1),
+                'color': colors[idx % len(colors)]
+            })
+    else:
+        # Dados de exemplo se não houver prontuários
+        service_distribution = [
+            {'name': 'Consultas', 'value': 35, 'color': '#009688'},
+            {'name': 'Avaliações', 'value': 25, 'color': '#66BB6A'},
+            {'name': 'Procedimentos', 'value': 20, 'color': '#FF8099'},
+            {'name': 'Evoluções', 'value': 15, 'color': '#BA68C8'},
+            {'name': 'Outros', 'value': 5, 'color': '#FFC107'}
+        ]
+    
+    return Response({
+        'totalPatients': total_patients,
+        'activeRecords': active_records,
+        'documentsToday': documents_today,
+        'monthlyRevenue': monthly_revenue,
+        'weeklyGrowth': round(weekly_growth, 1),
+        'monthlyGrowth': round(monthly_growth, 1),
+        'weeklyData': weekly_data,
+        'monthlyTrend': monthly_trend,
+        'serviceDistribution': service_distribution
+    })

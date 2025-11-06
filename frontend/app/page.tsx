@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { apiRoutes } from "@/lib/api";
 import { 
   Users, 
@@ -19,7 +20,8 @@ import {
   PieChart,
   ArrowUpRight,
   ArrowDownRight,
-  Sparkles
+  Sparkles,
+  LogOut
 } from 'lucide-react';
 import { 
   LineChart, 
@@ -40,6 +42,8 @@ import {
 } from 'recharts';
 
 export default function Home() {
+  const router = useRouter();
+  const [currentUser, setCurrentUser] = useState<any>(null);
   const [stats, setStats] = useState({ 
     totalPatients: 0, 
     documentsToday: 0, 
@@ -50,57 +54,84 @@ export default function Home() {
   });
   const [loading, setLoading] = useState(true);
 
-  // Dados para gráficos
-  const [weeklyData] = useState([
-    { day: 'Seg', pacientes: 12, consultas: 8, documentos: 15 },
-    { day: 'Ter', pacientes: 19, consultas: 14, documentos: 22 },
-    { day: 'Qua', pacientes: 15, consultas: 11, documentos: 18 },
-    { day: 'Qui', pacientes: 22, consultas: 18, documentos: 25 },
-    { day: 'Sex', pacientes: 28, consultas: 22, documentos: 32 },
-    { day: 'Sáb', pacientes: 8, consultas: 5, documentos: 10 },
-    { day: 'Dom', pacientes: 5, consultas: 3, documentos: 6 }
-  ]);
+  // Dados para gráficos - agora vindos da API
+  const [weeklyData, setWeeklyData] = useState<any[]>([]);
+  const [monthlyTrend, setMonthlyTrend] = useState<any[]>([]);
+  const [serviceDistribution, setServiceDistribution] = useState<any[]>([]);
 
-  const [monthlyTrend] = useState([
-    { month: 'Jan', value: 65 },
-    { month: 'Fev', value: 78 },
-    { month: 'Mar', value: 85 },
-    { month: 'Abr', value: 92 },
-    { month: 'Mai', value: 88 },
-    { month: 'Jun', value: 105 },
-    { month: 'Jul', value: 120 },
-    { month: 'Ago', value: 127 }
-  ]);
-
-  const [serviceDistribution] = useState([
-    { name: 'Ortopedia', value: 35, color: '#009688' },
-    { name: 'Neurologia', value: 25, color: '#66BB6A' },
-    { name: 'Traumato', value: 20, color: '#FF8099' },
-    { name: 'Esportiva', value: 15, color: '#BA68C8' },
-    { name: 'Outros', value: 5, color: '#FFC107' }
-  ]);
-
-  useEffect(() => { loadDashboardData(); }, []);
+  useEffect(() => { 
+    // Verificar se o usuário está logado
+    const user = localStorage.getItem('user');
+    if (!user) {
+      router.push('/welcome');
+      return;
+    }
+    setCurrentUser(JSON.parse(user));
+    loadDashboardData(); 
+  }, [router]);
 
   const loadDashboardData = async () => {
     try {
-      const patientsResponse = await apiRoutes.patients.list();
-      const totalPatients = patientsResponse.data.count || patientsResponse.data.length || 0;
+      // Buscar estatísticas do dashboard
+      const dashboardResponse = await apiRoutes.statistics.dashboard();
+      const data = dashboardResponse.data;
       
+      // Buscar pacientes recentes
+      const patientsResponse = await apiRoutes.patients.list();
+      const recentPatients = patientsResponse.data.results?.slice(0, 5) || patientsResponse.data.slice(0, 5) || [];
+      
+      // Atualizar stats com dados reais
       setStats({
-        totalPatients,
-        documentsToday: Math.floor(totalPatients * 0.15),
-        recentPatients: patientsResponse.data.results?.slice(0, 5) || patientsResponse.data.slice(0, 5) || [],
-        weeklyGrowth: 15.3,
-        monthlyRevenue: totalPatients * 150,
-        activeRecords: Math.floor(totalPatients * 0.7)
+        totalPatients: data.totalPatients,
+        documentsToday: data.documentsToday,
+        recentPatients: recentPatients,
+        weeklyGrowth: data.weeklyGrowth,
+        monthlyRevenue: data.monthlyRevenue,
+        activeRecords: data.activeRecords
       });
+
+      // Atualizar gráficos com dados reais
+      setWeeklyData(data.weeklyData);
+      setMonthlyTrend(data.monthlyTrend);
+      setServiceDistribution(data.serviceDistribution);
     } catch (error) { 
-      console.error('Erro:', error);
-      setStats(prev => ({ ...prev, totalPatients: 127, documentsToday: 19, weeklyGrowth: 15.3, monthlyRevenue: 19050, activeRecords: 89 }));
+      console.error('Erro ao carregar dados:', error);
+      // Dados de fallback em caso de erro
+      setStats(prev => ({ 
+        ...prev, 
+        totalPatients: 0, 
+        documentsToday: 0, 
+        weeklyGrowth: 0, 
+        monthlyRevenue: 0, 
+        activeRecords: 0 
+      }));
     }
     finally { setLoading(false); }
   };
+
+  const handleLogout = async () => {
+    try {
+      await apiRoutes.auth.logout();
+    } catch (error) {
+      console.error('Erro ao fazer logout:', error);
+    } finally {
+      localStorage.removeItem('user');
+      router.push('/login');
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#F5F7FA] flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 mx-auto bg-gradient-to-br from-[#009688] to-[#4DB6AC] rounded-full flex items-center justify-center mb-4 animate-pulse">
+            <Sparkles className="w-8 h-8 text-white" />
+          </div>
+          <p className="text-[#2C3E50] font-medium">Carregando...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#F5F7FA]">
@@ -118,6 +149,29 @@ export default function Home() {
               <p className="text-white/90 text-sm">Sistema de Gestão Fisioterapêutica • Desenvolvido pela Core Hive</p>
             </div>
             <div className="flex items-center gap-4">
+              {currentUser && (
+                <div className="flex items-center gap-3 bg-white/10 backdrop-blur-sm rounded-lg px-4 py-2">
+                  <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center">
+                    <span className="text-[#009688] font-semibold text-sm">
+                      {currentUser.first_name?.charAt(0) || currentUser.username?.charAt(0).toUpperCase()}
+                    </span>
+                  </div>
+                  <div className="hidden sm:block">
+                    <p className="text-white text-sm font-medium">
+                      {currentUser.first_name} {currentUser.last_name}
+                    </p>
+                    <p className="text-white/70 text-xs">{currentUser.user_type_display || currentUser.user_type}</p>
+                  </div>
+                </div>
+              )}
+              <button
+                onClick={handleLogout}
+                className="flex items-center gap-2 bg-white/10 backdrop-blur-sm rounded-lg px-4 py-2 hover:bg-white/20 transition-colors"
+                title="Sair"
+              >
+                <LogOut className="w-4 h-4 text-white" />
+                <span className="text-white text-sm font-medium hidden sm:inline">Sair</span>
+              </button>
               <div className="flex items-center gap-2 bg-white/10 backdrop-blur-sm rounded-lg px-4 py-2">
                 <Clock className="w-4 h-4 text-white" />
                 <span className="text-white text-sm font-medium">{new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}</span>
