@@ -3,12 +3,13 @@ from rest_framework.decorators import api_view, permission_classes, action
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from django.contrib.auth import authenticate, login, logout
-from .models import User
+from .models import User, Lead
 from .serializers import (
     UserSerializer,
     UserRegistrationSerializer,
     LoginSerializer,
-    UserProfileSerializer
+    UserProfileSerializer,
+    LeadSerializer
 )
 
 
@@ -16,16 +17,50 @@ from .serializers import (
 @permission_classes([AllowAny])
 def register_user(request):
     """
-    Registro de novos usuários
-    POST /api/auth/register/
+    ❌ ENDPOINT DESABILITADO - Registro público removido
+    
+    O PhysioCapture é um produto B2B corporativo.
+    Apenas a equipe Core Hive pode cadastrar novas clínicas e usuários.
+    
+    Para contratar o serviço, preencha o formulário de interesse na landing page.
     """
-    serializer = UserRegistrationSerializer(data=request.data)
+    return Response({
+        'error': 'Registro público desabilitado.',
+        'message': 'Entre em contato com a Core Hive para contratar o PhysioCapture.',
+        'contact': 'contato@corehive.com.br'
+    }, status=status.HTTP_403_FORBIDDEN)
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def create_lead(request):
+    """
+    Captura de interesse de novas clínicas (Landing Page)
+    POST /api/auth/leads/
+    
+    Body:
+    {
+        "nome_clinica": "Fisio Saúde",
+        "nome_responsavel": "Dr. João Silva",
+        "email": "contato@fisiosaude.com.br",
+        "telefone": "(81) 99999-9999",
+        "num_fisioterapeutas": 5,
+        "mensagem": "Gostaria de conhecer o sistema"
+    }
+    """
+    serializer = LeadSerializer(data=request.data)
     if serializer.is_valid():
-        user = serializer.save()
+        lead = serializer.save()
+        
+        # TODO: Enviar email para equipe Core Hive
+        # TODO: Enviar email de confirmação para a clínica
+        
         return Response({
-            'message': 'Usuário criado com sucesso!',
-            'user': UserSerializer(user).data
+            'message': 'Interesse registrado com sucesso!',
+            'info': 'Nossa equipe entrará em contato em breve.',
+            'lead_id': lead.id
         }, status=status.HTTP_201_CREATED)
+    
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -63,13 +98,19 @@ def login_user(request):
 
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([AllowAny])
 def logout_user(request):
     """
     Logout de usuários
     POST /api/auth/logout/
+    
+    Permite logout mesmo sem autenticação para evitar erros
     """
-    logout(request)
+    try:
+        logout(request)
+    except Exception:
+        pass  # Ignora erros se não houver sessão
+    
     return Response({
         'message': 'Logout realizado com sucesso!'
     }, status=status.HTTP_200_OK)

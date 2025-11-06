@@ -9,10 +9,10 @@ export default function BottomNav() {
 
   const navItems = [
     {
-      href: '/',
+      href: '/dashboard',
       icon: Home,
       label: 'Início',
-      active: pathname === '/',
+      active: pathname === '/dashboard',
     },
     {
       href: '/patients',

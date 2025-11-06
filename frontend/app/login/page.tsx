@@ -34,9 +34,11 @@ export default function LoginPage() {
       // Salvar dados do usuário no localStorage
       localStorage.setItem('user', JSON.stringify(response.data.user));
       
-      // Redirecionar para o dashboard (todos os tipos de usuário vão para a mesma página)
-      // Apenas GESTOR e FISIOTERAPEUTA podem fazer login
-      router.push('/');
+      // Pequeno delay para garantir que o localStorage seja salvo
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      // Redirecionar para o dashboard
+      window.location.href = '/dashboard';
     } catch (err: any) {
       setError(err.response?.data?.error || 'Erro ao fazer login. Tente novamente.');
     } finally {
@@ -142,16 +144,16 @@ export default function LoginPage() {
               )}
             </button>
 
-            {/* Link de Registro */}
+            {/* Link de Suporte */}
             <div className="text-center pt-4 border-t border-gray-100">
               <p className="text-sm text-[#7F8C8D]">
-                Não tem uma conta?{' '}
-                <Link 
-                  href="/register" 
+                Esqueceu sua senha?{' '}
+                <a 
+                  href="mailto:contato@corehive.com.br" 
                   className="text-[#009688] font-semibold hover:text-[#4DB6AC] transition-colors"
                 >
-                  Cadastre-se
-                </Link>
+                  Entre em contato
+                </a>
               </p>
             </div>
           </form>

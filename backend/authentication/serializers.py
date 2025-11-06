@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import User, Clinica
+from .models import User, Clinica, Lead
 
 
 class ClinicaSerializer(serializers.ModelSerializer):
@@ -91,3 +91,31 @@ class UserProfileSerializer(serializers.ModelSerializer):
             'profile_picture', 'is_active_user', 'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'created_at', 'updated_at', 'user_type_display', 'clinica_data']
+
+
+class LeadSerializer(serializers.ModelSerializer):
+    """
+    Serializer para captura de leads de novas clínicas
+    Usado na landing page para interesse de contratação
+    """
+    
+    class Meta:
+        model = Lead
+        fields = [
+            'id', 'nome_clinica', 'nome_responsavel', 'email', 'telefone',
+            'num_fisioterapeutas', 'mensagem', 'status', 'created_at'
+        ]
+        read_only_fields = ['id', 'status', 'created_at']
+    
+    def validate_email(self, value):
+        """Validar email corporativo (opcional)"""
+        # Pode adicionar validação adicional se necessário
+        return value.lower()
+    
+    def validate_num_fisioterapeutas(self, value):
+        """Validar número de fisioterapeutas"""
+        if value < 1:
+            raise serializers.ValidationError("Deve haver pelo menos 1 fisioterapeuta.")
+        if value > 999:
+            raise serializers.ValidationError("Número muito alto. Entre em contato diretamente.")
+        return value

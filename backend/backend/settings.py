@@ -161,6 +161,17 @@ CORS_ALLOWED_ORIGINS = [
 # Permitir cookies/credenciais (habilitado para sessões)
 CORS_ALLOW_CREDENTIALS = True
 
+# CSRF - Configuração para permitir requisições do frontend
+CSRF_TRUSTED_ORIGINS = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+]
+
+# Session Cookie - Configuração para funcionar com CORS
+SESSION_COOKIE_SAMESITE = 'Lax'
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SECURE = False  # True apenas em HTTPS/produção
+
 # Permitir todos os headers
 CORS_ALLOW_ALL_ORIGINS = False  # False em produção!
 CORS_ALLOW_HEADERS = [

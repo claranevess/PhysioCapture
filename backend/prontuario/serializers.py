@@ -16,7 +16,7 @@ class PatientSerializer(serializers.ModelSerializer):
     """
     Serializer para o modelo Patient com foto
     """
-    created_by_name = serializers.CharField(source='created_by.get_full_name', read_only=True)
+    fisioterapeuta_name = serializers.CharField(source='fisioterapeuta.get_full_name', read_only=True)
     age = serializers.SerializerMethodField()
     photo_url = serializers.SerializerMethodField()
     
@@ -27,10 +27,10 @@ class PatientSerializer(serializers.ModelSerializer):
             'phone', 'email', 'address', 'city', 'state', 'zip_code',
             'photo', 'photo_url',
             'chief_complaint', 'blood_type', 'allergies', 'medications', 'medical_history',
-            'created_at', 'updated_at', 'created_by', 'created_by_name',
+            'created_at', 'updated_at', 'fisioterapeuta', 'fisioterapeuta_name',
             'is_active', 'age', 'last_visit', 'notes'
         ]
-        read_only_fields = ['created_at', 'updated_at', 'created_by', 'photo_url']
+        read_only_fields = ['created_at', 'updated_at', 'fisioterapeuta', 'photo_url']
     
     def get_age(self, obj):
         """

@@ -38,7 +38,7 @@ export default function Header() {
           {/* Desktop Navigation */}
           <nav className="hidden md:flex items-center space-x-1">
             <Link
-              href="/"
+              href="/dashboard"
               className="px-4 py-2 rounded-lg text-white/90 hover:bg-white/20 hover:text-white transition-all duration-300 font-semibold backdrop-blur-sm"
             >
               Dashboard
@@ -115,7 +115,7 @@ export default function Header() {
           <div className="md:hidden border-t border-white/20 py-4 backdrop-blur-md">
             <nav className="flex flex-col space-y-2">
               <Link
-                href="/"
+                href="/dashboard"
                 className="px-4 py-3 text-white hover:bg-white/20 rounded-lg transition-all duration-300 font-semibold flex items-center gap-3"
                 onClick={() => setMobileMenuOpen(false)}
               >

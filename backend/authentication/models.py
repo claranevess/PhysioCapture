@@ -164,3 +164,77 @@ class User(AbstractUser):
             return paciente.fisioterapeuta_id == self.id
         
         return False
+
+
+class Lead(models.Model):
+    """
+    Captura de interesse de novas clínicas
+    Leads são clínicas que demonstraram interesse em contratar o PhysioCapture
+    A equipe Core Hive entra em contato e converte o lead em cliente
+    """
+    
+    STATUS_CHOICES = [
+        ('NOVO', 'Novo Lead'),
+        ('CONTATO', 'Em Contato'),
+        ('DEMONSTRACAO', 'Demonstração Agendada'),
+        ('PROPOSTA', 'Proposta Enviada'),
+        ('CONVERTIDO', 'Convertido em Cliente'),
+        ('PERDIDO', 'Lead Perdido'),
+    ]
+    
+    # Informações da Clínica
+    nome_clinica = models.CharField(max_length=255, verbose_name='Nome da Clínica')
+    nome_responsavel = models.CharField(max_length=255, verbose_name='Nome do Responsável')
+    email = models.EmailField(verbose_name='Email')
+    telefone = models.CharField(max_length=20, verbose_name='Telefone')
+    num_fisioterapeutas = models.IntegerField(
+        default=1,
+        verbose_name='Número de Fisioterapeutas',
+        help_text='Quantidade estimada de profissionais que usarão o sistema'
+    )
+    mensagem = models.TextField(blank=True, verbose_name='Mensagem')
+    
+    # Controle
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default='NOVO',
+        verbose_name='Status'
+    )
+    
+    # Conversão
+    clinica_convertida = models.ForeignKey(
+        Clinica,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='leads',
+        verbose_name='Clínica Convertida',
+        help_text='Preenchido quando o lead se torna cliente'
+    )
+    
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='Data de Cadastro')
+    updated_at = models.DateTimeField(auto_now=True, verbose_name='Última Atualização')
+    
+    # Observações internas (Core Hive)
+    notas = models.TextField(
+        blank=True,
+        verbose_name='Notas Internas',
+        help_text='Observações da equipe Core Hive'
+    )
+    
+    class Meta:
+        verbose_name = 'Lead'
+        verbose_name_plural = 'Leads'
+        ordering = ['-created_at']
+    
+    def __str__(self):
+        return f"{self.nome_clinica} - {self.get_status_display()}"
+    
+    @property
+    def dias_desde_criacao(self):
+        """Quantos dias desde que o lead foi criado"""
+        from django.utils import timezone
+        delta = timezone.now() - self.created_at
+        return delta.days
