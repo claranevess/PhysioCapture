@@ -7,6 +7,7 @@ from .views import (
     logout_user,
     current_user,
     update_profile,
+    change_password,
     UserViewSet
 )
 
@@ -21,6 +22,7 @@ urlpatterns = [
     path('logout/', logout_user, name='logout'),
     path('me/', current_user, name='current-user'),
     path('profile/', update_profile, name='update-profile'),
+    path('change-password/', change_password, name='change-password'),
     
     # Rotas do ViewSet
     path('', include(router.urls)),

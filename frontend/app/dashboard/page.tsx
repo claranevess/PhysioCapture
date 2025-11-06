@@ -20,8 +20,7 @@ import {
   PieChart,
   ArrowUpRight,
   ArrowDownRight,
-  Sparkles,
-  LogOut
+  Sparkles
 } from 'lucide-react';
 import { 
   LineChart, 
@@ -109,17 +108,6 @@ export default function Home() {
     finally { setLoading(false); }
   };
 
-  const handleLogout = async () => {
-    try {
-      await apiRoutes.auth.logout();
-    } catch (error) {
-      console.error('Erro ao fazer logout:', error);
-    } finally {
-      localStorage.removeItem('user');
-      router.push('/login');
-    }
-  };
-
   if (loading) {
     return (
       <div className="min-h-screen bg-[#F5F7FA] flex items-center justify-center">
@@ -164,14 +152,6 @@ export default function Home() {
                   </div>
                 </div>
               )}
-              <button
-                onClick={handleLogout}
-                className="flex items-center gap-2 bg-white/10 backdrop-blur-sm rounded-lg px-4 py-2 hover:bg-white/20 transition-colors"
-                title="Sair"
-              >
-                <LogOut className="w-4 h-4 text-white" />
-                <span className="text-white text-sm font-medium hidden sm:inline">Sair</span>
-              </button>
               <div className="flex items-center gap-2 bg-white/10 backdrop-blur-sm rounded-lg px-4 py-2">
                 <Clock className="w-4 h-4 text-white" />
                 <span className="text-white text-sm font-medium">{new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}</span>

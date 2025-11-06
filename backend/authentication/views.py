@@ -117,25 +117,38 @@ def logout_user(request):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([AllowAny])  # SEM AUTENTICAÇÃO - APENAS DESENVOLVIMENTO
 def current_user(request):
     """
     Retorna informações do usuário logado
     GET /api/auth/me/
     """
-    serializer = UserProfileSerializer(request.user)
-    return Response(serializer.data)
+    # Para desenvolvimento: retornar primeiro usuário ativo
+    try:
+        user = User.objects.filter(is_active_user=True).first()
+        if not user:
+            return Response({'error': 'Nenhum usuário encontrado'}, status=404)
+        
+        serializer = UserProfileSerializer(user)
+        return Response(serializer.data)
+    except Exception as e:
+        return Response({'error': str(e)}, status=500)
 
 
 @api_view(['PUT', 'PATCH'])
-@permission_classes([IsAuthenticated])
+@permission_classes([AllowAny])  # SEM AUTENTICAÇÃO - APENAS DESENVOLVIMENTO
 def update_profile(request):
     """
     Atualiza perfil do usuário logado
     PUT/PATCH /api/auth/profile/
     """
+    # Para desenvolvimento: pegar primeiro usuário
+    user = User.objects.filter(is_active_user=True).first()
+    if not user:
+        return Response({'error': 'Nenhum usuário encontrado'}, status=404)
+    
     serializer = UserProfileSerializer(
-        request.user,
+        user,
         data=request.data,
         partial=True
     )
@@ -146,6 +159,53 @@ def update_profile(request):
             'user': serializer.data
         })
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])  # SEM AUTENTICAÇÃO - APENAS DESENVOLVIMENTO
+def change_password(request):
+    """
+    Altera a senha do usuário logado
+    POST /api/auth/change-password/
+    
+    Body:
+    {
+        "old_password": "senha_atual",
+        "new_password": "nova_senha"
+    }
+    """
+    # Para desenvolvimento: pegar primeiro usuário
+    user = User.objects.filter(is_active_user=True).first()
+    if not user:
+        return Response({'error': 'Nenhum usuário encontrado'}, status=404)
+    
+    old_password = request.data.get('old_password')
+    new_password = request.data.get('new_password')
+    
+    if not old_password or not new_password:
+        return Response({
+            'error': 'Senha atual e nova senha são obrigatórias.'
+        }, status=status.HTTP_400_BAD_REQUEST)
+    
+    # Verifica se a senha atual está correta
+    if not user.check_password(old_password):
+        return Response({
+            'error': 'Senha atual incorreta.'
+        }, status=status.HTTP_400_BAD_REQUEST)
+    
+    # Valida tamanho mínimo da nova senha
+    if len(new_password) < 6:
+        return Response({
+            'error': 'A nova senha deve ter pelo menos 6 caracteres.'
+        }, status=status.HTTP_400_BAD_REQUEST)
+    
+    # Atualiza a senha
+    user.set_password(new_password)
+    user.save()
+    
+    return Response({
+        'message': 'Senha alterada com sucesso!'
+    }, status=status.HTTP_200_OK)
 
 
 class UserViewSet(viewsets.ModelViewSet):
