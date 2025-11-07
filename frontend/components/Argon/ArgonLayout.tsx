@@ -1,0 +1,72 @@
+'use client';
+
+/**
+ * Argon Dashboard Layout - PhysioCapture
+ * Layout principal com Sidenav e Navbar
+ */
+
+import { usePathname } from 'next/navigation';
+import ArgonSidenav from './ArgonSidenav';
+import ArgonNavbar from './ArgonNavbar';
+import { argonTheme } from '@/lib/argon-theme';
+
+interface ArgonLayoutProps {
+  children: React.ReactNode;
+}
+
+const publicRoutes = ['/login', '/register', '/welcome', '/'];
+
+export default function ArgonLayout({ children }: ArgonLayoutProps) {
+  const pathname = usePathname();
+  const isPublicRoute = publicRoutes.includes(pathname);
+
+  if (isPublicRoute) {
+    return <>{children}</>;
+  }
+
+  return (
+    <div className="min-h-screen" style={{ backgroundColor: argonTheme.colors.background.default }}>
+      {/* Sidenav */}
+      <ArgonSidenav />
+
+      {/* Main Content Area */}
+      <div className="lg:ml-[280px] min-h-screen flex flex-col">
+        {/* Navbar */}
+        <ArgonNavbar />
+
+        {/* Page Content */}
+        <main className="flex-1 p-4 sm:p-6 lg:p-8">
+          {children}
+        </main>
+
+        {/* Footer */}
+        <footer 
+          className="px-4 sm:px-6 lg:px-8 py-6 border-t border-gray-100 bg-white"
+        >
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+            <p 
+              className="text-sm"
+              style={{ color: argonTheme.colors.text.secondary }}
+            >
+              © 2025 PhysioCapture • Sistema de Gestão Fisioterapêutica
+            </p>
+            <div className="flex items-center gap-2">
+              <span 
+                className="text-sm"
+                style={{ color: argonTheme.colors.text.secondary }}
+              >
+                Desenvolvido por
+              </span>
+              <span 
+                className="text-sm font-semibold"
+                style={{ color: argonTheme.colors.primary.main }}
+              >
+                Core Hive
+              </span>
+            </div>
+          </div>
+        </footer>
+      </div>
+    </div>
+  );
+}

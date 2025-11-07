@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { apiRoutes } from '@/lib/api';
@@ -47,11 +47,6 @@ export default function DigitizePage() {
   const [isUploading, setIsUploading] = useState(false);
   const [searchPatient, setSearchPatient] = useState('');
 
-  // Carregar pacientes e categorias
-  useState(() => {
-    loadData();
-  });
-
   const loadData = async () => {
     try {
       const [patientsRes, categoriesRes] = await Promise.all([
@@ -64,6 +59,11 @@ export default function DigitizePage() {
       console.error('Erro ao carregar dados:', error);
     }
   };
+
+  // Carregar pacientes e categorias ao montar o componente
+  useEffect(() => {
+    loadData();
+  }, []);
 
   const handleFileSelect = (selectedFiles: FileList | null) => {
     if (!selectedFiles) return;
@@ -104,8 +104,14 @@ export default function DigitizePage() {
   };
 
   const uploadFiles = async () => {
-    if (!selectedPatient || files.length === 0) {
-      alert('Selecione um paciente e adicione pelo menos um arquivo');
+    // Validação obrigatória de paciente
+    if (!selectedPatient) {
+      alert('⚠️ É obrigatório selecionar um paciente antes de enviar os documentos!');
+      return;
+    }
+    
+    if (files.length === 0) {
+      alert('⚠️ Adicione pelo menos um arquivo antes de enviar!');
       return;
     }
 
@@ -177,7 +183,7 @@ export default function DigitizePage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex items-center gap-4">
             <Link
-              href="/"
+              href="/dashboard"
               className="w-10 h-10 bg-white/20 backdrop-blur-sm rounded-lg flex items-center justify-center hover:bg-white/30 transition-colors"
             >
               <ArrowLeft className="w-5 h-5 text-white" />

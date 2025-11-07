@@ -8,6 +8,7 @@ from .views import (
     current_user,
     update_profile,
     change_password,
+    list_fisioterapeutas,
     UserViewSet
 )
 
@@ -23,6 +24,9 @@ urlpatterns = [
     path('me/', current_user, name='current-user'),
     path('profile/', update_profile, name='update-profile'),
     path('change-password/', change_password, name='change-password'),
+    
+    # Fisioterapeutas (apenas Gestores)
+    path('fisioterapeutas/', list_fisioterapeutas, name='list-fisioterapeutas'),
     
     # Rotas do ViewSet
     path('', include(router.urls)),

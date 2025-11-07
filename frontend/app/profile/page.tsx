@@ -3,7 +3,11 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { apiRoutes } from '@/lib/api';
-import { User, Mail, Phone, Building2, Shield, Key, Save, ArrowLeft, Sparkles } from 'lucide-react';
+import ArgonLayout from '@/components/Argon/ArgonLayout';
+import { ArgonCard } from '@/components/Argon/ArgonCard';
+import { ArgonButton } from '@/components/Argon/ArgonButton';
+import { argonTheme } from '@/lib/argon-theme';
+import { User, Mail, Phone, Building2, Shield, Key, Save, Sparkles } from 'lucide-react';
 
 interface UserData {
   id: number;
@@ -125,79 +129,138 @@ export default function ProfilePage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#F5F7FA] flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-16 h-16 mx-auto bg-gradient-to-br from-[#009688] to-[#4DB6AC] rounded-full flex items-center justify-center mb-4 animate-pulse">
-            <Sparkles className="w-8 h-8 text-white" />
+      <ArgonLayout>
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <div className="text-center">
+            <div 
+              className="w-16 h-16 mx-auto rounded-full flex items-center justify-center mb-4 animate-pulse"
+              style={{ background: argonTheme.gradients.primary }}
+            >
+              <Sparkles className="w-8 h-8 text-white" />
+            </div>
+            <p className="font-medium" style={{ color: argonTheme.colors.text.primary }}>
+              Carregando...
+            </p>
           </div>
-          <p className="text-[#2C3E50] font-medium">Carregando...</p>
         </div>
-      </div>
+      </ArgonLayout>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#F5F7FA] p-6">
-      <div className="max-w-4xl mx-auto">
+    <ArgonLayout>
+      <div className="max-w-4xl mx-auto space-y-6">
         {/* Header */}
-        <div className="mb-6">
-          <button
-            onClick={() => router.push('/dashboard')}
-            className="flex items-center gap-2 text-[#2C3E50] hover:text-[#009688] transition-colors mb-4"
+        <div>
+          <h1 
+            className="text-3xl font-bold mb-2"
+            style={{ color: argonTheme.colors.text.primary }}
           >
-            <ArrowLeft className="w-5 h-5" />
-            <span className="font-medium">Voltar ao Dashboard</span>
-          </button>
-          <h1 className="text-3xl font-bold text-[#2C3E50]">Configurações da Conta</h1>
-          <p className="text-gray-600 mt-2">Gerencie suas informações pessoais e preferências</p>
+            Configurações da Conta
+          </h1>
+          <p style={{ color: argonTheme.colors.text.secondary }}>
+            Gerencie suas informações pessoais e preferências
+          </p>
         </div>
 
         {/* Mensagens */}
         {message.text && (
-          <div className={`mb-6 p-4 rounded-lg ${
-            message.type === 'success' 
-              ? 'bg-green-50 border border-green-200 text-green-800' 
-              : 'bg-red-50 border border-red-200 text-red-800'
-          }`}>
-            {message.text}
-          </div>
+          <ArgonCard
+            className="p-4"
+            style={{
+              backgroundColor: message.type === 'success' 
+                ? `${argonTheme.colors.success.main}20` 
+                : `${argonTheme.colors.error.main}20`,
+              borderLeft: `4px solid ${message.type === 'success' 
+                ? argonTheme.colors.success.main 
+                : argonTheme.colors.error.main}`
+            }}
+          >
+            <p style={{ 
+              color: message.type === 'success' 
+                ? argonTheme.colors.success.main 
+                : argonTheme.colors.error.main,
+              fontWeight: 500
+            }}>
+              {message.text}
+            </p>
+          </ArgonCard>
         )}
 
         {/* Informações da Clínica - Read-only */}
         {userData?.clinica && (
-          <div className="bg-white rounded-xl shadow-sm p-6 mb-6 border border-gray-200">
+          <ArgonCard className="p-6">
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 bg-gradient-to-br from-[#009688] to-[#4DB6AC] rounded-lg flex items-center justify-center">
+              <div 
+                className="w-10 h-10 rounded-lg flex items-center justify-center shadow-md"
+                style={{ background: argonTheme.gradients.primary }}
+              >
                 <Building2 className="w-5 h-5 text-white" />
               </div>
-              <h2 className="text-xl font-semibold text-[#2C3E50]">Informações da Clínica</h2>
+              <h2 
+                className="text-xl font-semibold"
+                style={{ color: argonTheme.colors.text.primary }}
+              >
+                Informações da Clínica
+              </h2>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-600 mb-1">Nome da Clínica</label>
-                <p className="text-[#2C3E50] font-medium">{userData.clinica.nome}</p>
+                <label 
+                  className="block text-sm font-medium mb-1"
+                  style={{ color: argonTheme.colors.text.secondary }}
+                >
+                  Nome da Clínica
+                </label>
+                <p 
+                  className="font-medium"
+                  style={{ color: argonTheme.colors.text.primary }}
+                >
+                  {userData.clinica.nome}
+                </p>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-600 mb-1">CNPJ</label>
-                <p className="text-[#2C3E50] font-medium">{userData.clinica.cnpj}</p>
+                <label 
+                  className="block text-sm font-medium mb-1"
+                  style={{ color: argonTheme.colors.text.secondary }}
+                >
+                  CNPJ
+                </label>
+                <p 
+                  className="font-medium"
+                  style={{ color: argonTheme.colors.text.primary }}
+                >
+                  {userData.clinica.cnpj}
+                </p>
               </div>
             </div>
-          </div>
+          </ArgonCard>
         )}
 
         {/* Informações Pessoais */}
-        <div className="bg-white rounded-xl shadow-sm p-6 mb-6 border border-gray-200">
+        <ArgonCard className="p-6">
           <div className="flex items-center gap-3 mb-6">
-            <div className="w-10 h-10 bg-gradient-to-br from-[#009688] to-[#4DB6AC] rounded-lg flex items-center justify-center">
+            <div 
+              className="w-10 h-10 rounded-lg flex items-center justify-center shadow-md"
+              style={{ background: argonTheme.gradients.primary }}
+            >
               <User className="w-5 h-5 text-white" />
             </div>
-            <h2 className="text-xl font-semibold text-[#2C3E50]">Informações Pessoais</h2>
+            <h2 
+              className="text-xl font-semibold"
+              style={{ color: argonTheme.colors.text.primary }}
+            >
+              Informações Pessoais
+            </h2>
           </div>
 
           <div className="space-y-4">
             {/* Email - Read-only */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label 
+                className="block text-sm font-medium mb-2"
+                style={{ color: argonTheme.colors.text.primary }}
+              >
                 <Mail className="w-4 h-4 inline mr-2" />
                 E-mail (não editável)
               </label>
@@ -205,13 +268,21 @@ export default function ProfilePage() {
                 type="email"
                 value={userData?.email || ''}
                 disabled
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-600 cursor-not-allowed"
+                className="w-full px-4 py-2 border rounded-lg cursor-not-allowed"
+                style={{
+                  borderColor: argonTheme.colors.grey[200],
+                  backgroundColor: argonTheme.colors.grey[50],
+                  color: argonTheme.colors.text.secondary
+                }}
               />
             </div>
 
             {/* Tipo de Usuário - Read-only */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label 
+                className="block text-sm font-medium mb-2"
+                style={{ color: argonTheme.colors.text.primary }}
+              >
                 <Shield className="w-4 h-4 inline mr-2" />
                 Tipo de Usuário
               </label>
@@ -219,33 +290,62 @@ export default function ProfilePage() {
                 type="text"
                 value={userData?.user_type_display || userData?.user_type || ''}
                 disabled
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-600 cursor-not-allowed"
+                className="w-full px-4 py-2 border rounded-lg cursor-not-allowed"
+                style={{
+                  borderColor: argonTheme.colors.grey[200],
+                  backgroundColor: argonTheme.colors.grey[50],
+                  color: argonTheme.colors.text.secondary
+                }}
               />
             </div>
 
             {/* Nome */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label 
+                  className="block text-sm font-medium mb-2"
+                  style={{ color: argonTheme.colors.text.primary }}
+                >
                   Nome
                 </label>
                 <input
                   type="text"
                   value={formData.first_name}
                   onChange={(e) => setFormData({ ...formData, first_name: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#009688] focus:border-transparent"
+                  className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 transition-all"
+                  style={{ borderColor: argonTheme.colors.grey[200] }}
+                  onFocus={(e) => {
+                    e.target.style.borderColor = argonTheme.colors.primary.main;
+                    e.target.style.boxShadow = argonTheme.shadows.primary;
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = argonTheme.colors.grey[200];
+                    e.target.style.boxShadow = 'none';
+                  }}
                   placeholder="Seu primeiro nome"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label 
+                  className="block text-sm font-medium mb-2"
+                  style={{ color: argonTheme.colors.text.primary }}
+                >
                   Sobrenome
                 </label>
                 <input
                   type="text"
                   value={formData.last_name}
                   onChange={(e) => setFormData({ ...formData, last_name: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#009688] focus:border-transparent"
+                  className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 transition-all"
+                  style={{ borderColor: argonTheme.colors.grey[200] }}
+                  onFocus={(e) => {
+                    e.target.style.borderColor = argonTheme.colors.primary.main;
+                    e.target.style.boxShadow = argonTheme.shadows.primary;
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = argonTheme.colors.grey[200];
+                    e.target.style.boxShadow = 'none';
+                  }}
                   placeholder="Seu sobrenome"
                 />
               </div>
@@ -253,7 +353,10 @@ export default function ProfilePage() {
 
             {/* Telefone */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label 
+                className="block text-sm font-medium mb-2"
+                style={{ color: argonTheme.colors.text.primary }}
+              >
                 <Phone className="w-4 h-4 inline mr-2" />
                 Telefone
               </label>
@@ -261,80 +364,138 @@ export default function ProfilePage() {
                 type="tel"
                 value={formData.telefone}
                 onChange={(e) => setFormData({ ...formData, telefone: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#009688] focus:border-transparent"
+                className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 transition-all"
+                style={{ borderColor: argonTheme.colors.grey[200] }}
+                onFocus={(e) => {
+                  e.target.style.borderColor = argonTheme.colors.primary.main;
+                  e.target.style.boxShadow = argonTheme.shadows.primary;
+                }}
+                onBlur={(e) => {
+                  e.target.style.borderColor = argonTheme.colors.grey[200];
+                  e.target.style.boxShadow = 'none';
+                }}
                 placeholder="(00) 00000-0000"
               />
             </div>
           </div>
-        </div>
+        </ArgonCard>
 
         {/* Alteração de Senha */}
-        <div className="bg-white rounded-xl shadow-sm p-6 mb-6 border border-gray-200">
+        <ArgonCard className="p-6">
           <div className="flex items-center gap-3 mb-6">
-            <div className="w-10 h-10 bg-gradient-to-br from-[#009688] to-[#4DB6AC] rounded-lg flex items-center justify-center">
+            <div 
+              className="w-10 h-10 rounded-lg flex items-center justify-center shadow-md"
+              style={{ background: argonTheme.gradients.primary }}
+            >
               <Key className="w-5 h-5 text-white" />
             </div>
-            <h2 className="text-xl font-semibold text-[#2C3E50]">Alterar Senha</h2>
+            <h2 
+              className="text-xl font-semibold"
+              style={{ color: argonTheme.colors.text.primary }}
+            >
+              Alterar Senha
+            </h2>
           </div>
 
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label 
+                className="block text-sm font-medium mb-2"
+                style={{ color: argonTheme.colors.text.primary }}
+              >
                 Senha Atual
               </label>
               <input
                 type="password"
                 value={formData.currentPassword}
                 onChange={(e) => setFormData({ ...formData, currentPassword: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#009688] focus:border-transparent"
+                className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 transition-all"
+                style={{ borderColor: argonTheme.colors.grey[200] }}
+                onFocus={(e) => {
+                  e.target.style.borderColor = argonTheme.colors.primary.main;
+                  e.target.style.boxShadow = argonTheme.shadows.primary;
+                }}
+                onBlur={(e) => {
+                  e.target.style.borderColor = argonTheme.colors.grey[200];
+                  e.target.style.boxShadow = 'none';
+                }}
                 placeholder="Digite sua senha atual"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label 
+                className="block text-sm font-medium mb-2"
+                style={{ color: argonTheme.colors.text.primary }}
+              >
                 Nova Senha
               </label>
               <input
                 type="password"
                 value={formData.newPassword}
                 onChange={(e) => setFormData({ ...formData, newPassword: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#009688] focus:border-transparent"
+                className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 transition-all"
+                style={{ borderColor: argonTheme.colors.grey[200] }}
+                onFocus={(e) => {
+                  e.target.style.borderColor = argonTheme.colors.primary.main;
+                  e.target.style.boxShadow = argonTheme.shadows.primary;
+                }}
+                onBlur={(e) => {
+                  e.target.style.borderColor = argonTheme.colors.grey[200];
+                  e.target.style.boxShadow = 'none';
+                }}
                 placeholder="Digite sua nova senha (mínimo 6 caracteres)"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label 
+                className="block text-sm font-medium mb-2"
+                style={{ color: argonTheme.colors.text.primary }}
+              >
                 Confirmar Nova Senha
               </label>
               <input
                 type="password"
                 value={formData.confirmPassword}
                 onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#009688] focus:border-transparent"
+                className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 transition-all"
+                style={{ borderColor: argonTheme.colors.grey[200] }}
+                onFocus={(e) => {
+                  e.target.style.borderColor = argonTheme.colors.primary.main;
+                  e.target.style.boxShadow = argonTheme.shadows.primary;
+                }}
+                onBlur={(e) => {
+                  e.target.style.borderColor = argonTheme.colors.grey[200];
+                  e.target.style.boxShadow = 'none';
+                }}
                 placeholder="Confirme sua nova senha"
               />
             </div>
 
-            <p className="text-sm text-gray-600">
+            <p 
+              className="text-sm"
+              style={{ color: argonTheme.colors.text.secondary }}
+            >
               Deixe em branco se não quiser alterar a senha
             </p>
           </div>
-        </div>
+        </ArgonCard>
 
         {/* Botão Salvar */}
         <div className="flex justify-end">
-          <button
+          <ArgonButton
+            variant="gradient"
+            color="primary"
+            size="lg"
+            icon={<Save className="w-5 h-5" />}
             onClick={handleSaveProfile}
             disabled={saving}
-            className="flex items-center gap-2 bg-gradient-to-r from-[#009688] to-[#4DB6AC] text-white px-8 py-3 rounded-lg font-semibold hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <Save className="w-5 h-5" />
             {saving ? 'Salvando...' : 'Salvar Alterações'}
-          </button>
+          </ArgonButton>
         </div>
       </div>
-    </div>
+    </ArgonLayout>
   );
 }

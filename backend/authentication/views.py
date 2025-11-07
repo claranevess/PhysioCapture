@@ -122,10 +122,17 @@ def current_user(request):
     """
     Retorna informações do usuário logado
     GET /api/auth/me/
+    
+    DESENVOLVIMENTO: Retorna o primeiro gestor ativo (consistente com outros endpoints)
     """
-    # Para desenvolvimento: retornar primeiro usuário ativo
+    # Para desenvolvimento: retornar primeiro gestor ativo para consistência
     try:
-        user = User.objects.filter(is_active_user=True).first()
+        # Priorizar gestor para consistência com dashboard e outras APIs
+        user = User.objects.filter(user_type='GESTOR', is_active_user=True).order_by('id').first()
+        if not user:
+            # Fallback: qualquer usuário ativo
+            user = User.objects.filter(is_active_user=True).order_by('id').first()
+        
         if not user:
             return Response({'error': 'Nenhum usuário encontrado'}, status=404)
         
@@ -206,6 +213,65 @@ def change_password(request):
     return Response({
         'message': 'Senha alterada com sucesso!'
     }, status=status.HTTP_200_OK)
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])  # SEM AUTENTICAÇÃO - APENAS DESENVOLVIMENTO
+def list_fisioterapeutas(request):
+    """
+    Lista fisioterapeutas da clínica
+    GET /api/auth/fisioterapeutas/
+    GET /api/auth/fisioterapeutas/?user_id=1  (simula usuário específico)
+    
+    DESENVOLVIMENTO: Sem autenticação
+    """
+    from prontuario.models import Patient
+    from django.db.models import Count
+    
+    # Para desenvolvimento: simular usuário gestor
+    user_id = request.query_params.get('user_id')
+    if user_id:
+        try:
+            simulated_user = User.objects.get(id=user_id)
+        except User.DoesNotExist:
+            simulated_user = User.objects.filter(user_type='GESTOR', is_active_user=True).order_by('id').first()
+    else:
+        # Pegar primeiro gestor ativo (ordenado por ID para consistência)
+        simulated_user = User.objects.filter(user_type='GESTOR', is_active_user=True).order_by('id').first()
+    
+    if not simulated_user or not simulated_user.clinica:
+        # Se não houver gestor, retornar todos os fisioterapeutas
+        fisioterapeutas = User.objects.filter(
+            user_type='FISIOTERAPEUTA'
+        ).annotate(
+            patient_count=Count('meus_pacientes')
+        ).order_by('first_name', 'last_name')
+    else:
+        # Buscar fisioterapeutas da mesma clínica do usuário simulado
+        fisioterapeutas = User.objects.filter(
+            clinica=simulated_user.clinica,
+            user_type='FISIOTERAPEUTA'
+        ).annotate(
+            patient_count=Count('meus_pacientes')  # Conta os pacientes associados
+        ).order_by('first_name', 'last_name')
+    
+    # Serializar os dados
+    data = []
+    for fisio in fisioterapeutas:
+        data.append({
+            'id': fisio.id,
+            'username': fisio.username,
+            'first_name': fisio.first_name,
+            'last_name': fisio.last_name,
+            'email': fisio.email,
+            'phone': fisio.phone,
+            'crefito': fisio.crefito,
+            'especialidade': fisio.especialidade,
+            'is_active_user': fisio.is_active_user,
+            'patient_count': fisio.patient_count,
+        })
+    
+    return Response(data, status=status.HTTP_200_OK)
 
 
 class UserViewSet(viewsets.ModelViewSet):

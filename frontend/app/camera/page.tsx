@@ -4,6 +4,10 @@ import { useState, useRef, useCallback } from 'react';
 import Webcam from 'react-webcam';
 import { Camera, Upload, RotateCw, Check, X, FileText } from 'lucide-react';
 import { apiRoutes } from '@/lib/api';
+import ArgonLayout from '@/components/Argon/ArgonLayout';
+import { ArgonCard } from '@/components/Argon/ArgonCard';
+import { ArgonButton } from '@/components/Argon/ArgonButton';
+import { argonTheme } from '@/lib/argon-theme';
 
 export default function CameraPage() {
   const webcamRef = useRef<Webcam>(null);
@@ -106,41 +110,65 @@ export default function CameraPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-900 flex flex-col">
-      {/* Header */}
-      <div className="bg-gray-800 text-white p-4 flex items-center justify-between">
-        <div className="flex items-center space-x-2">
-          <Camera className="h-6 w-6" />
-          <h1 className="text-lg font-bold">Digitalizar Documento</h1>
+    <ArgonLayout>
+      <div className="mb-6 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div 
+            className="w-12 h-12 rounded-xl flex items-center justify-center shadow-lg"
+            style={{ background: argonTheme.gradients.primary }}
+          >
+            <Camera className="w-6 h-6 text-white" />
+          </div>
+          <div>
+            <h1 
+              className="text-2xl font-bold"
+              style={{ color: argonTheme.colors.text.primary }}
+            >
+              Digitalizar Documento
+            </h1>
+            <p style={{ color: argonTheme.colors.text.secondary }}>
+              Capture ou faça upload de documentos para processar com OCR
+            </p>
+          </div>
         </div>
         {step !== 'capture' && (
-          <button
+          <ArgonButton
+            variant="outline"
+            color="error"
+            icon={<X className="w-5 h-5" />}
             onClick={reset}
-            className="p-2 hover:bg-gray-700 rounded-lg transition-colors"
           >
-            <X className="h-5 w-5" />
-          </button>
+            Cancelar
+          </ArgonButton>
         )}
       </div>
 
-      {/* Main Content */}
-      <div className="flex-1 flex items-center justify-center p-4">
+      <div className="flex items-center justify-center">
         {step === 'capture' && (
           <div className="w-full max-w-2xl">
-            <div className="bg-gray-800 rounded-lg overflow-hidden shadow-2xl">
+            <ArgonCard>
               <Webcam
                 ref={webcamRef}
                 audio={false}
                 screenshotFormat="image/jpeg"
                 videoConstraints={videoConstraints}
-                className="w-full aspect-[4/3] object-cover"
+                className="w-full aspect-[4/3] object-cover rounded-t-xl"
               />
 
               {/* Controls */}
-              <div className="p-4 bg-gray-900 flex items-center justify-center space-x-4">
+              <div 
+                className="p-6 flex items-center justify-center gap-6"
+                style={{ background: argonTheme.colors.grey[50] }}
+              >
                 {/* Upload Button */}
-                <label className="p-4 bg-gray-700 hover:bg-gray-600 rounded-full cursor-pointer transition-colors">
-                  <Upload className="h-6 w-6 text-white" />
+                <label 
+                  className="p-4 rounded-xl cursor-pointer transition-all shadow-md hover:shadow-lg"
+                  style={{ 
+                    backgroundColor: argonTheme.colors.grey[200],
+                    color: argonTheme.colors.text.primary
+                  }}
+                >
+                  <Upload className="h-6 w-6" />
                   <input
                     type="file"
                     accept="image/*,application/pdf"
@@ -152,7 +180,8 @@ export default function CameraPage() {
                 {/* Capture Button */}
                 <button
                   onClick={capture}
-                  className="w-16 h-16 bg-blue-600 hover:bg-blue-700 rounded-full flex items-center justify-center shadow-lg transition-all transform hover:scale-105 active:scale-95"
+                  className="w-16 h-16 rounded-full flex items-center justify-center shadow-lg transition-all transform hover:scale-105 active:scale-95"
+                  style={{ background: argonTheme.gradients.primary }}
                 >
                   <Camera className="h-8 w-8 text-white" />
                 </button>
@@ -160,127 +189,191 @@ export default function CameraPage() {
                 {/* Rotate Camera */}
                 <button
                   onClick={toggleCamera}
-                  className="p-4 bg-gray-700 hover:bg-gray-600 rounded-full transition-colors"
+                  className="p-4 rounded-xl transition-all shadow-md hover:shadow-lg"
+                  style={{ 
+                    backgroundColor: argonTheme.colors.grey[200],
+                    color: argonTheme.colors.text.primary
+                  }}
                 >
-                  <RotateCw className="h-6 w-6 text-white" />
+                  <RotateCw className="h-6 w-6" />
                 </button>
               </div>
-            </div>
+            </ArgonCard>
 
             {/* Instructions */}
-            <div className="mt-6 bg-gray-800 rounded-lg p-4 text-white">
-              <h3 className="font-semibold mb-2">💡 Dicas para melhor resultado:</h3>
-              <ul className="text-sm space-y-1 text-gray-300">
-                <li>✓ Use boa iluminação</li>
-                <li>✓ Mantenha a câmera firme</li>
-                <li>✓ Centralize o documento</li>
-                <li>✓ Evite sombras e reflexos</li>
-              </ul>
-            </div>
+            <ArgonCard className="mt-6">
+              <div className="p-6">
+                <h3 
+                  className="font-bold text-lg mb-4 flex items-center gap-2"
+                  style={{ color: argonTheme.colors.text.primary }}
+                >
+                  <span className="text-2xl">💡</span>
+                  Dicas para melhor resultado
+                </h3>
+                <ul 
+                  className="space-y-2"
+                  style={{ color: argonTheme.colors.text.secondary }}
+                >
+                  <li className="flex items-center gap-2">
+                    <Check className="w-4 h-4" style={{ color: argonTheme.colors.success.main }} />
+                    Use boa iluminação
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="w-4 h-4" style={{ color: argonTheme.colors.success.main }} />
+                    Mantenha a câmera firme
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="w-4 h-4" style={{ color: argonTheme.colors.success.main }} />
+                    Centralize o documento
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="w-4 h-4" style={{ color: argonTheme.colors.success.main }} />
+                    Evite sombras e reflexos
+                  </li>
+                </ul>
+              </div>
+            </ArgonCard>
           </div>
         )}
 
         {step === 'preview' && previewUrl && (
           <div className="w-full max-w-2xl">
-            <div className="bg-gray-800 rounded-lg overflow-hidden shadow-2xl">
+            <ArgonCard>
               <img
                 src={previewUrl}
                 alt="Preview"
-                className="w-full aspect-[4/3] object-contain"
+                className="w-full aspect-[4/3] object-contain rounded-t-xl"
               />
 
               {/* Controls */}
-              <div className="p-6 bg-gray-900 space-y-4">
-                <button
+              <div className="p-6 space-y-4">
+                <ArgonButton
+                  variant="gradient"
+                  color="primary"
+                  icon={<FileText className="h-5 w-5" />}
                   onClick={processOCR}
-                  className="w-full bg-blue-600 hover:bg-blue-700 text-white py-4 px-6 rounded-lg font-semibold flex items-center justify-center space-x-2 transition-colors"
+                  fullWidth
+                  size="lg"
                 >
-                  <FileText className="h-5 w-5" />
-                  <span>Extrair Texto (OCR)</span>
-                </button>
+                  Extrair Texto (OCR)
+                </ArgonButton>
 
                 <div className="grid grid-cols-2 gap-3">
-                  <button
+                  <ArgonButton
+                    variant="outline"
+                    color="primary"
                     onClick={reset}
-                    className="bg-gray-700 hover:bg-gray-600 text-white py-3 px-4 rounded-lg font-medium transition-colors"
+                    fullWidth
                   >
                     Tirar Nova Foto
-                  </button>
-                  <button
+                  </ArgonButton>
+                  <ArgonButton
+                    variant="gradient"
+                    color="success"
                     onClick={saveDocument}
-                    className="bg-green-600 hover:bg-green-700 text-white py-3 px-4 rounded-lg font-medium transition-colors"
+                    fullWidth
                   >
                     Salvar Direto
-                  </button>
+                  </ArgonButton>
                 </div>
               </div>
-            </div>
+            </ArgonCard>
           </div>
         )}
 
         {step === 'processing' && (
-          <div className="text-center text-white">
-            <div className="inline-block animate-spin rounded-full h-16 w-16 border-4 border-gray-700 border-t-blue-600 mb-4"></div>
-            <h2 className="text-xl font-bold mb-2">Processando OCR...</h2>
-            <p className="text-gray-400">Extraindo texto do documento</p>
+          <div className="text-center">
+            <div 
+              className="inline-block animate-spin rounded-full h-16 w-16 border-4 mb-4"
+              style={{ 
+                borderColor: argonTheme.colors.grey[200],
+                borderTopColor: argonTheme.colors.primary.main
+              }}
+            ></div>
+            <h2 
+              className="text-xl font-bold mb-2"
+              style={{ color: argonTheme.colors.text.primary }}
+            >
+              Processando OCR...
+            </h2>
+            <p style={{ color: argonTheme.colors.text.secondary }}>
+              Extraindo texto do documento
+            </p>
           </div>
         )}
 
         {step === 'result' && ocrResult && (
           <div className="w-full max-w-4xl space-y-4">
             {/* Preview da imagem */}
-            <div className="bg-gray-800 rounded-lg p-4">
-              <img
-                src={previewUrl!}
-                alt="Documento processado"
-                className="w-full max-h-64 object-contain rounded"
-              />
-            </div>
+            <ArgonCard>
+              <div className="p-4">
+                <img
+                  src={previewUrl!}
+                  alt="Documento processado"
+                  className="w-full max-h-64 object-contain rounded-xl"
+                />
+              </div>
+            </ArgonCard>
 
             {/* Resultado do OCR */}
-            <div className="bg-white rounded-lg shadow-xl">
-              <div className="p-4 bg-green-600 text-white rounded-t-lg flex items-center justify-between">
-                <div className="flex items-center space-x-2">
+            <ArgonCard>
+              <div 
+                className="p-6 rounded-t-xl text-white flex items-center justify-between"
+                style={{ background: argonTheme.gradients.success }}
+              >
+                <div className="flex items-center gap-2">
                   <Check className="h-5 w-5" />
-                  <h2 className="font-bold">Texto Extraído com Sucesso!</h2>
+                  <h2 className="font-bold text-lg">Texto Extraído com Sucesso!</h2>
                 </div>
-                <span className="text-sm bg-white/20 px-3 py-1 rounded-full">
+                <span className="text-sm bg-white/20 px-3 py-1.5 rounded-full font-medium">
                   Confiança: {ocrResult.confidence?.toFixed(0)}%
                 </span>
               </div>
 
               <div className="p-6">
                 <div className="mb-4">
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  <label 
+                    className="block text-sm font-semibold mb-2"
+                    style={{ color: argonTheme.colors.text.primary }}
+                  >
                     Texto Extraído (editável):
                   </label>
                   <textarea
                     defaultValue={ocrResult.text}
-                    className="w-full h-64 p-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm font-mono"
+                    className="w-full h-64 p-4 rounded-xl text-sm font-mono focus:outline-none focus:ring-2 transition-all"
+                    style={{ 
+                      border: `1px solid ${argonTheme.colors.grey[200]}`,
+                      color: argonTheme.colors.text.primary,
+                      backgroundColor: argonTheme.colors.grey[50]
+                    }}
                     placeholder="Texto extraído aparecerá aqui..."
                   />
                 </div>
 
                 {/* Actions */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <button
+                  <ArgonButton
+                    variant="outline"
+                    color="primary"
                     onClick={reset}
-                    className="bg-gray-200 hover:bg-gray-300 text-gray-800 py-3 px-4 rounded-lg font-medium transition-colors"
+                    fullWidth
                   >
                     ← Nova Captura
-                  </button>
-                  <button
+                  </ArgonButton>
+                  <ArgonButton
+                    variant="gradient"
+                    color="primary"
                     onClick={saveDocument}
-                    className="bg-blue-600 hover:bg-blue-700 text-white py-3 px-4 rounded-lg font-medium transition-colors"
+                    fullWidth
                   >
                     Salvar Documento →
-                  </button>
+                  </ArgonButton>
                 </div>
               </div>
-            </div>
+            </ArgonCard>
           </div>
         )}
       </div>
-    </div>
+    </ArgonLayout>
   );
 }

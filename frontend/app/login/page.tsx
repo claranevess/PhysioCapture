@@ -32,6 +32,7 @@ export default function LoginPage() {
       const response = await api.post('/api/auth/login/', formData);
       
       // Salvar dados do usuário no localStorage
+      // A autenticação é feita via cookie de sessão Django (withCredentials: true)
       localStorage.setItem('user', JSON.stringify(response.data.user));
       
       // Pequeno delay para garantir que o localStorage seja salvo

@@ -12,15 +12,22 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
+/* Removido dark mode automático - aplicação usa tema claro fixo */
 
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+/* Garantir que inputs sempre tenham texto escuro visível */
+input,
+textarea,
+select {
+  color: #2C3E50 !important;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: #7F8C8D !important;
 }
