@@ -11,7 +11,8 @@ import {
   AlertCircle,
   Loader2,
   Sparkles,
-  ArrowRight
+  ArrowRight,
+  ArrowLeft
 } from 'lucide-react';
 
 export default function LoginPage() {
@@ -48,7 +49,16 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F5F7FA] flex items-center justify-center p-4">
+    <div className="min-h-screen bg-[#F5F7FA] flex items-center justify-center p-4 relative">
+      {/* Botão Voltar - Canto Superior Esquerdo */}
+      <Link
+        href="/"
+        className="absolute top-6 left-6 inline-flex items-center gap-2 px-4 py-2 bg-white rounded-lg shadow-sm border border-gray-200 text-[#2C3E50] hover:text-[#009688] hover:border-[#009688] transition-all group"
+      >
+        <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
+        <span className="font-medium">Voltar</span>
+      </Link>
+
       <div className="w-full max-w-md">
         {/* Logo e Header */}
         <div className="text-center mb-8">

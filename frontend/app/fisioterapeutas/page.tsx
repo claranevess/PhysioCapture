@@ -4,7 +4,8 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import ArgonLayout from '@/components/Argon/ArgonLayout';
 import { api } from '@/lib/api';
-import { Stethoscope, Mail, Phone, Users, CheckCircle, XCircle, Search } from 'lucide-react';
+import { Stethoscope, Mail, Phone, Users, CheckCircle, XCircle, Search, Plus } from 'lucide-react';
+import Link from 'next/link';
 
 interface Fisioterapeuta {
   id: number;
@@ -72,14 +73,24 @@ export default function FisioterapeutasPage() {
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="mb-8">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl flex items-center justify-center">
-              <Stethoscope className="w-6 h-6 text-white" />
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl flex items-center justify-center">
+                <Stethoscope className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <h1 className="text-3xl font-bold text-gray-900">Fisioterapeutas</h1>
+                <p className="text-gray-600">Equipe da clínica</p>
+              </div>
             </div>
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">Fisioterapeutas</h1>
-              <p className="text-gray-600">Equipe da clínica</p>
-            </div>
+            
+            <Link
+              href="/fisioterapeutas/novo"
+              className="px-6 py-3 bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-lg hover:shadow-lg transition-all flex items-center gap-2 font-semibold"
+            >
+              <Plus className="w-5 h-5" />
+              Novo Fisioterapeuta
+            </Link>
           </div>
         </div>
 

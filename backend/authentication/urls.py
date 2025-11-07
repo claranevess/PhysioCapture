@@ -9,6 +9,7 @@ from .views import (
     update_profile,
     change_password,
     list_fisioterapeutas,
+    create_fisioterapeuta,
     UserViewSet
 )
 
@@ -27,6 +28,7 @@ urlpatterns = [
     
     # Fisioterapeutas (apenas Gestores)
     path('fisioterapeutas/', list_fisioterapeutas, name='list-fisioterapeutas'),
+    path('fisioterapeutas/create/', create_fisioterapeuta, name='create-fisioterapeuta'),
     
     # Rotas do ViewSet
     path('', include(router.urls)),

@@ -274,6 +274,114 @@ def list_fisioterapeutas(request):
     return Response(data, status=status.HTTP_200_OK)
 
 
+@api_view(['POST'])
+@permission_classes([AllowAny])  # SEM AUTENTICAÇÃO - APENAS DESENVOLVIMENTO
+def create_fisioterapeuta(request):
+    """
+    Cria um novo fisioterapeuta na clínica do gestor logado
+    POST /api/auth/fisioterapeutas/create/
+    
+    DESENVOLVIMENTO: Sem autenticação - usa primeiro gestor ativo
+    
+    Body (JSON):
+    {
+        "username": "fisio.exemplo",
+        "email": "fisio@exemplo.com",
+        "password": "senha123",
+        "first_name": "Nome",
+        "last_name": "Sobrenome",
+        "cpf": "000.000.000-00",
+        "phone": "(00) 00000-0000",
+        "crefito": "CREFITO-X/000000",
+        "especialidade": "Especialidade"
+    }
+    """
+    # Para desenvolvimento: simular primeiro gestor ativo
+    user_id = request.query_params.get('user_id')
+    if user_id:
+        try:
+            simulated_user = User.objects.get(id=user_id)
+        except User.DoesNotExist:
+            simulated_user = User.objects.filter(user_type='GESTOR', is_active_user=True).order_by('id').first()
+    else:
+        simulated_user = User.objects.filter(user_type='GESTOR', is_active_user=True).order_by('id').first()
+    
+    if not simulated_user or simulated_user.user_type != 'GESTOR':
+        return Response(
+            {'error': 'Apenas gestores podem cadastrar fisioterapeutas.'},
+            status=status.HTTP_403_FORBIDDEN
+        )
+    
+    if not simulated_user.clinica:
+        return Response(
+            {'error': 'Gestor não está associado a uma clínica.'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    # Validar dados obrigatórios
+    required_fields = ['username', 'email', 'password', 'first_name', 'last_name']
+    for field in required_fields:
+        if not request.data.get(field):
+            return Response(
+                {'error': f'Campo obrigatório: {field}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+    
+    # Verificar se username já existe
+    if User.objects.filter(username=request.data['username']).exists():
+        return Response(
+            {'error': 'Nome de usuário já existe.'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    # Verificar se email já existe
+    if User.objects.filter(email=request.data['email']).exists():
+        return Response(
+            {'error': 'Email já está em uso.'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    try:
+        # Criar fisioterapeuta
+        fisioterapeuta = User.objects.create(
+            username=request.data['username'],
+            email=request.data['email'],
+            first_name=request.data['first_name'],
+            last_name=request.data['last_name'],
+            cpf=request.data.get('cpf', ''),
+            phone=request.data.get('phone', ''),
+            crefito=request.data.get('crefito', ''),
+            especialidade=request.data.get('especialidade', ''),
+            clinica=simulated_user.clinica,  # Associar à clínica do gestor
+            user_type='FISIOTERAPEUTA',
+            is_active=True,
+            is_active_user=True,
+        )
+        
+        # Definir senha
+        fisioterapeuta.set_password(request.data['password'])
+        fisioterapeuta.save()
+        
+        return Response({
+            'message': 'Fisioterapeuta cadastrado com sucesso!',
+            'fisioterapeuta': {
+                'id': fisioterapeuta.id,
+                'username': fisioterapeuta.username,
+                'email': fisioterapeuta.email,
+                'first_name': fisioterapeuta.first_name,
+                'last_name': fisioterapeuta.last_name,
+                'crefito': fisioterapeuta.crefito,
+                'especialidade': fisioterapeuta.especialidade,
+            }
+        }, status=status.HTTP_201_CREATED)
+        
+    except Exception as e:
+        return Response(
+            {'error': f'Erro ao criar fisioterapeuta: {str(e)}'},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
 class UserViewSet(viewsets.ModelViewSet):
     """
     ViewSet para gerenciamento de usuários (apenas ADMIN)
