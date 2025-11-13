@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
 from pathlib import Path
+import sys
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -239,7 +240,11 @@ ALLOWED_DOCUMENT_EXTENSIONS = [
 
 # Tesseract OCR Configuration (Windows)
 # Ajuste o caminho se necessário
-TESSERACT_CMD = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
+if sys.platform == 'win32':
+    # Caminho específico para Windows
+    TESSERACT_CMD = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
+
+
 
 # OCR Languages
 OCR_LANGUAGES = 'por+eng'  # Português e Inglês
