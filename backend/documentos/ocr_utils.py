@@ -34,12 +34,7 @@ class OCRProcessor:
     def preprocess_image(self, image_path):
         """
         Pré-processa a imagem para melhorar a precisão do OCR
-        
-        Args:
-            image_path: Caminho para a imagem
-            
-        Returns:
-            Imagem pré-processada (numpy array)
+        Detecta fundo escuro e inverte se necessário
         """
         # Carrega a imagem
         img = cv2.imread(image_path)
@@ -47,14 +42,22 @@ class OCRProcessor:
         # Converte para escala de cinza
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         
-        # Aplica threshold adaptativo para melhorar contraste
-        processed = cv2.adaptiveThreshold(
-            gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, 
-            cv2.THRESH_BINARY, 11, 2
-        )
+        # --- LÓGICA DE DETECÇÃO DE MODO ESCURO ---
+        # Calcula a média de brilho dos pixels
+        mean_brightness = np.mean(gray)
         
-        # Remove ruído
-        processed = cv2.medianBlur(processed, 3)
+        # Se a média for menor que 127 (imagem escura), inverte as cores
+        if mean_brightness < 127:
+            gray = cv2.bitwise_not(gray) # Inverte Fundo Preto/Letra Branca
+        # ----------------------------------------
+
+        # --- LÓGICA DE LIMPEZA PARA SCREENSHOTS ---
+        # Em vez de adaptiveThreshold, usamos um threshold global simples.
+        # O método OTSU encontra automaticamente o melhor valor de corte.
+        # Isso cria uma imagem preta e branca pura, sem "borrões".
+        _, processed = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+        
+        # NÃO vamos usar medianBlur, pois as imagens são limpas.
         
         return processed
     
