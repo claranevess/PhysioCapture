@@ -130,14 +130,16 @@ export default function DigitizePage() {
 
         const formData = new FormData();
         formData.append('file', fileItem.file);
-        formData.append('patient', selectedPatient.toString());
+        formData.append('patient_id', selectedPatient.toString());
         formData.append('title', title || fileItem.file.name);
         formData.append('description', description);
+        const docType = fileItem.file.type.includes('pdf') ? 'PDF' : 'IMAGE';
+        formData.append('document_type', docType);
         if (selectedCategory) {
           formData.append('category', selectedCategory.toString());
         }
 
-        await apiRoutes.documents.create(formData);
+        await apiRoutes.documents.digitalize(formData);
 
         // Atualizar para success
         setFiles((prev) =>
