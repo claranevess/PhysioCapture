@@ -63,6 +63,9 @@ export const apiRoutes = {
     create: (data: FormData) => api.post('/api/documentos/documents/', data, {
       headers: { 'Content-Type': 'multipart/form-data' },
     }),
+    digitalize: (data: FormData) => api.post('/api/documentos/digitalize/', data, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }),
     update: (id: number, data: any) => api.patch(`/api/documentos/documents/${id}/`, data),
     delete: (id: number) => api.delete(`/api/documentos/documents/${id}/`),
     download: (id: number) => api.get(`/api/documentos/documents/${id}/download/`, {
