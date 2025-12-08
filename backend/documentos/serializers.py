@@ -137,6 +137,9 @@ class DocumentCreateSerializer(serializers.ModelSerializer):
     """
     Serializer para criar documentos
     """
+    # Tornar document_type opcional (será detectado automaticamente se não enviado)
+    document_type = serializers.CharField(required=False, allow_blank=True)
+    
     class Meta:
         model = Document
         fields = [
@@ -153,6 +156,29 @@ class DocumentCreateSerializer(serializers.ModelSerializer):
         if value.size > max_size:
             raise serializers.ValidationError("O arquivo não pode ser maior que 50MB.")
         return value
+    
+    def validate(self, data):
+        """
+        Auto-detecta o document_type baseado na extensão do arquivo
+        """
+        file = data.get('file')
+        document_type = data.get('document_type')
+        
+        # Se document_type não foi enviado, detectar pela extensão
+        if not document_type and file:
+            import os
+            ext = os.path.splitext(file.name)[1].lower()
+            
+            ext_to_type = {
+                '.pdf': 'PDF',
+                '.jpg': 'IMAGE', '.jpeg': 'IMAGE', '.png': 'IMAGE', 
+                '.gif': 'IMAGE', '.bmp': 'IMAGE', '.tiff': 'IMAGE',
+                '.doc': 'DOC', '.docx': 'DOC',
+                '.xls': 'EXCEL', '.xlsx': 'EXCEL',
+            }
+            data['document_type'] = ext_to_type.get(ext, 'OTHER')
+        
+        return data
 
 
 class DocumentUpdateSerializer(serializers.ModelSerializer):

@@ -127,6 +127,59 @@ NEXT_PUBLIC_API_URL=http://127.0.0.1:8000
 
 ---
 
+## Configurar o Assistente de IA (Chatbot)
+
+O PhysioCapture possui um assistente de IA integrado que utiliza um modelo de linguagem local (LLM). Para ativá-lo, siga os passos abaixo:
+
+### Passo 5: Baixar o Modelo LLM
+
+#### 5.1. Baixe o modelo do Google Drive
+
+📥 **Link para download:** [INSERIR_LINK_DO_DRIVE_AQUI]
+
+> **Arquivo:** `DeepSeek-R1-0528-Qwen3-8B-Q4_K_M.gguf`  
+> **Tamanho aproximado:** ~5GB
+
+#### 5.2. Crie a pasta `models_llm` no backend
+
+```bash
+cd backend
+mkdir models_llm
+```
+
+#### 5.3. Mova o arquivo baixado para a pasta
+
+Coloque o arquivo `DeepSeek-R1-0528-Qwen3-8B-Q4_K_M.gguf` dentro da pasta:
+
+```
+backend/
+└── models_llm/
+    └── DeepSeek-R1-0528-Qwen3-8B-Q4_K_M.gguf
+```
+
+#### 5.4. Verifique a instalação(Opcional)
+
+Para verificar se o modelo está configurado corretamente:
+
+```bash
+cd backend
+python -c "from physio_ai import check_model_status; print(check_model_status())"
+```
+
+**Resultado esperado:** Deverá exibir `model_exists: True`.
+
+### Requisitos Adicionais para o Chatbot
+
+O chatbot requer a biblioteca `llama-cpp-python`. Caso ainda não esteja instalada:
+
+```bash
+pip install llama-cpp-python
+```
+
+> ⚠️ **Nota:** O modelo é grande (~5GB) e pode demorar para ser carregado na primeira execução. As execuções subsequentes serão mais rápidas devido ao cache.
+
+---
+
 ## Como Executar
 
 ### Executar o Backend (Django)

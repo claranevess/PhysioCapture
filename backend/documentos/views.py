@@ -122,16 +122,19 @@ class DocumentViewSet(viewsets.ModelViewSet):
         """
         Cria um novo documento e registra no log
         """
-        document = serializer.save(uploaded_by=self.request.user)
+        # Definir uploaded_by apenas se usuário autenticado
+        user = self.request.user if self.request.user.is_authenticated else None
+        document = serializer.save(uploaded_by=user)
         
-        # Registrar acesso no log
-        DocumentAccessLog.objects.create(
-            document=document,
-            user=self.request.user,
-            action='VIEW',
-            ip_address=self.get_client_ip(),
-            user_agent=self.request.META.get('HTTP_USER_AGENT', '')
-        )
+        # Registrar acesso no log (apenas se usuário autenticado)
+        if user:
+            DocumentAccessLog.objects.create(
+                document=document,
+                user=user,
+                action='VIEW',
+                ip_address=self.get_client_ip(),
+                user_agent=self.request.META.get('HTTP_USER_AGENT', '')
+            )
     
     def perform_update(self, serializer):
         """
@@ -171,14 +174,15 @@ class DocumentViewSet(viewsets.ModelViewSet):
         """
         instance = self.get_object()
         
-        # Registrar visualização no log
-        DocumentAccessLog.objects.create(
-            document=instance,
-            user=request.user,
-            action='VIEW',
-            ip_address=self.get_client_ip(),
-            user_agent=request.META.get('HTTP_USER_AGENT', '')
-        )
+        # Registrar visualização no log (apenas se usuário autenticado)
+        if request.user.is_authenticated:
+            DocumentAccessLog.objects.create(
+                document=instance,
+                user=request.user,
+                action='VIEW',
+                ip_address=self.get_client_ip(),
+                user_agent=request.META.get('HTTP_USER_AGENT', '')
+            )
         
         serializer = self.get_serializer(instance)
         return Response(serializer.data)
@@ -194,14 +198,15 @@ class DocumentViewSet(viewsets.ModelViewSet):
         if not document.file:
             raise Http404("Arquivo não encontrado")
         
-        # Registrar download no log
-        DocumentAccessLog.objects.create(
-            document=document,
-            user=request.user,
-            action='DOWNLOAD',
-            ip_address=self.get_client_ip(),
-            user_agent=request.META.get('HTTP_USER_AGENT', '')
-        )
+        # Registrar download no log (apenas se usuário autenticado)
+        if request.user.is_authenticated:
+            DocumentAccessLog.objects.create(
+                document=document,
+                user=request.user,
+                action='DOWNLOAD',
+                ip_address=self.get_client_ip(),
+                user_agent=request.META.get('HTTP_USER_AGENT', '')
+            )
         
         # Retornar o arquivo
         try:

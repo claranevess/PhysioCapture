@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { usePathname } from 'next/navigation';
 import { X, MessageCircle, Send } from 'lucide-react';
 
 interface Message {
@@ -8,7 +9,15 @@ interface Message {
   content: string;
 }
 
+// Rotas onde o chatbot NÃO deve aparecer
+const HIDDEN_ROUTES = ['/', '/login', '/register', '/landing'];
+
 export default function ChatbotAI() {
+  const pathname = usePathname();
+
+  // Não exibir chatbot na landing page e páginas de auth
+  const shouldHide = HIDDEN_ROUTES.includes(pathname);
+
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -19,6 +28,11 @@ export default function ChatbotAI() {
   ]);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+
+  // Se deve esconder, não renderizar nada
+  if (shouldHide) {
+    return null;
+  }
 
   const contextualSuggestions: Record<string, string[]> = {
     '/': [
@@ -63,12 +77,32 @@ export default function ChatbotAI() {
     setInputValue('');
     setIsLoading(true);
 
-    // Simula resposta da IA (aqui você integraria com OpenAI/Claude)
-    setTimeout(() => {
-      const response = getContextualResponse(inputValue);
-      setMessages((prev) => [...prev, { role: 'assistant', content: response }]);
+    try {
+      // Tenta chamar a API do backend
+      const response = await fetch('http://localhost:8000/api/assistant/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ message: inputValue }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setMessages((prev) => [...prev, { role: 'assistant', content: data.answer }]);
+      } else {
+        // Se a API falhar, usa respostas locais como fallback
+        const fallbackResponse = getContextualResponse(inputValue);
+        setMessages((prev) => [...prev, { role: 'assistant', content: fallbackResponse }]);
+      }
+    } catch (error) {
+      // Se não conseguir conectar, usa respostas locais como fallback
+      console.log('API não disponível, usando respostas locais');
+      const fallbackResponse = getContextualResponse(inputValue);
+      setMessages((prev) => [...prev, { role: 'assistant', content: fallbackResponse }]);
+    } finally {
       setIsLoading(false);
-    }, 1000);
+    }
   };
 
   const getContextualResponse = (question: string): string => {
@@ -151,11 +185,10 @@ export default function ChatbotAI() {
                 className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
               >
                 <div
-                  className={`max-w-[80%] p-3 rounded-lg ${
-                    msg.role === 'user'
-                      ? 'bg-blue-600 text-white rounded-br-none'
-                      : 'bg-gray-100 text-gray-800 rounded-bl-none'
-                  }`}
+                  className={`max-w-[80%] p-3 rounded-lg ${msg.role === 'user'
+                    ? 'bg-blue-600 text-white rounded-br-none'
+                    : 'bg-gray-100 text-gray-800 rounded-bl-none'
+                    }`}
                 >
                   <p className="text-sm whitespace-pre-line">{msg.content}</p>
                 </div>

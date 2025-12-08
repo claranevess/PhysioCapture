@@ -230,3 +230,10 @@ dump/
 # ========================================
 # docker-compose.override.yml
 # .dockerignore
+
+# ========================================
+# LOCAL LLM MODELS
+# ========================================
+# Arquivos de modelo GGUF são muito grandes para versionamento
+backend/models_llm/
+*.gguf

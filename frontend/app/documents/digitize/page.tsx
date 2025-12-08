@@ -4,11 +4,11 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { apiRoutes } from '@/lib/api';
-import { 
-  Camera, 
-  Upload, 
-  FileText, 
-  CheckCircle2, 
+import {
+  Camera,
+  Upload,
+  FileText,
+  CheckCircle2,
   AlertCircle,
   X,
   Sparkles,
@@ -35,7 +35,7 @@ export default function DigitizePage() {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
-  
+
   const [files, setFiles] = useState<PreviewFile[]>([]);
   const [patients, setPatients] = useState<any[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
@@ -46,6 +46,14 @@ export default function DigitizePage() {
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [searchPatient, setSearchPatient] = useState('');
+
+  // Estado para modal de sucesso
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [uploadResult, setUploadResult] = useState<{
+    successCount: number;
+    errorCount: number;
+    totalCount: number;
+  } | null>(null);
 
   const loadData = async () => {
     try {
@@ -103,19 +111,35 @@ export default function DigitizePage() {
     });
   };
 
+  // Limpar formulário e arquivos após sucesso
+  const resetForm = () => {
+    // Limpar previews de memória
+    files.forEach((f) => URL.revokeObjectURL(f.preview));
+    setFiles([]);
+    setTitle('');
+    setDescription('');
+    setSelectedCategory(null);
+    // Reset file inputs
+    if (fileInputRef.current) fileInputRef.current.value = '';
+    if (cameraInputRef.current) cameraInputRef.current.value = '';
+  };
+
   const uploadFiles = async () => {
     // Validação obrigatória de paciente
     if (!selectedPatient) {
       alert('⚠️ É obrigatório selecionar um paciente antes de enviar os documentos!');
       return;
     }
-    
+
     if (files.length === 0) {
       alert('⚠️ Adicione pelo menos um arquivo antes de enviar!');
       return;
     }
 
     setIsUploading(true);
+    let successCount = 0;
+    let errorCount = 0;
+    const totalCount = files.filter(f => f.status === 'pending').length;
 
     for (const fileItem of files) {
       if (fileItem.status !== 'pending') continue;
@@ -145,30 +169,45 @@ export default function DigitizePage() {
             f.id === fileItem.id ? { ...f, status: 'success', progress: 100 } : f
           )
         );
+        successCount++;
       } catch (error: any) {
         // Atualizar para error
         setFiles((prev) =>
           prev.map((f) =>
             f.id === fileItem.id
               ? {
-                  ...f,
-                  status: 'error',
-                  errorMessage: error.response?.data?.detail || 'Erro no upload',
-                }
+                ...f,
+                status: 'error',
+                errorMessage: error.response?.data?.detail || 'Erro no upload',
+              }
               : f
           )
         );
+        errorCount++;
       }
     }
 
     setIsUploading(false);
 
-    // Se todos foram enviados com sucesso, redirecionar
-    const allSuccess = files.every((f) => f.status === 'success');
-    if (allSuccess) {
-      setTimeout(() => {
-        router.push('/documents');
-      }, 1500);
+    // Mostrar resultado do upload
+    setUploadResult({ successCount, errorCount, totalCount });
+
+    // Se houve pelo menos um sucesso, mostrar modal
+    if (successCount > 0) {
+      setShowSuccessModal(true);
+      // Limpar formulário e arquivos se todos foram enviados com sucesso
+      if (errorCount === 0) {
+        resetForm();
+      }
+    }
+  };
+
+  // Fechar modal e navegar para documentos
+  const handleCloseSuccessModal = (navigate: boolean = false) => {
+    setShowSuccessModal(false);
+    setUploadResult(null);
+    if (navigate) {
+      router.push('/documents');
     }
   };
 
@@ -233,11 +272,10 @@ export default function DigitizePage() {
                   onDrop={handleDrop}
                   onDragOver={handleDragOver}
                   onDragLeave={handleDragLeave}
-                  className={`relative border-2 border-dashed rounded-xl p-12 transition-all ${
-                    isDragging
-                      ? 'border-[#009688] bg-[#009688]/5 scale-105'
-                      : 'border-gray-200 hover:border-[#009688]/50'
-                  }`}
+                  className={`relative border-2 border-dashed rounded-xl p-12 transition-all ${isDragging
+                    ? 'border-[#009688] bg-[#009688]/5 scale-105'
+                    : 'border-gray-200 hover:border-[#009688]/50'
+                    }`}
                 >
                   <div className="text-center">
                     <div className="w-20 h-20 mx-auto bg-gradient-to-br from-[#009688]/10 to-[#66BB6A]/10 rounded-full flex items-center justify-center mb-4">
@@ -460,19 +498,17 @@ export default function DigitizePage() {
                     <button
                       key={patient.id}
                       onClick={() => setSelectedPatient(patient.id)}
-                      className={`w-full text-left p-3 rounded-lg border transition-all ${
-                        selectedPatient === patient.id
-                          ? 'border-[#009688] bg-[#009688]/5 shadow-sm'
-                          : 'border-gray-200 hover:border-[#009688]/50 hover:bg-gray-50'
-                      }`}
+                      className={`w-full text-left p-3 rounded-lg border transition-all ${selectedPatient === patient.id
+                        ? 'border-[#009688] bg-[#009688]/5 shadow-sm'
+                        : 'border-gray-200 hover:border-[#009688]/50 hover:bg-gray-50'
+                        }`}
                     >
                       <div className="flex items-center gap-3">
                         <div
-                          className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-semibold text-sm ${
-                            selectedPatient === patient.id
-                              ? 'bg-gradient-to-br from-[#009688] to-[#4DB6AC]'
-                              : 'bg-gradient-to-br from-gray-400 to-gray-500'
-                          }`}
+                          className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-semibold text-sm ${selectedPatient === patient.id
+                            ? 'bg-gradient-to-br from-[#009688] to-[#4DB6AC]'
+                            : 'bg-gradient-to-br from-gray-400 to-gray-500'
+                            }`}
                         >
                           {patient.full_name?.charAt(0).toUpperCase()}
                         </div>
@@ -539,6 +575,57 @@ export default function DigitizePage() {
           </div>
         </div>
       </footer>
+
+      {/* Modal de Sucesso */}
+      {showSuccessModal && uploadResult && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden animate-in fade-in zoom-in duration-300">
+            {/* Header do Modal */}
+            <div className="bg-gradient-to-r from-[#009688] to-[#4DB6AC] p-6 text-center">
+              <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                <CheckCircle2 className="w-10 h-10 text-white" />
+              </div>
+              <h2 className="text-2xl font-bold text-white">
+                {uploadResult.errorCount === 0 ? 'Upload Concluído!' : 'Upload Parcialmente Concluído'}
+              </h2>
+            </div>
+
+            {/* Conteúdo do Modal */}
+            <div className="p-6 text-center">
+              <div className="space-y-3 mb-6">
+                <p className="text-[#2C3E50] text-lg">
+                  <span className="font-bold text-[#009688]">{uploadResult.successCount}</span>
+                  {uploadResult.successCount === 1 ? ' arquivo enviado' : ' arquivos enviados'} com sucesso
+                </p>
+
+                {uploadResult.errorCount > 0 && (
+                  <p className="text-red-500 flex items-center justify-center gap-2">
+                    <AlertCircle className="w-5 h-5" />
+                    {uploadResult.errorCount} {uploadResult.errorCount === 1 ? 'arquivo falhou' : 'arquivos falharam'}
+                  </p>
+                )}
+              </div>
+
+              <div className="flex flex-col gap-3">
+                <button
+                  onClick={() => handleCloseSuccessModal(true)}
+                  className="w-full px-6 py-3 bg-gradient-to-r from-[#009688] to-[#4DB6AC] text-white rounded-lg font-semibold hover:shadow-lg transition-all flex items-center justify-center gap-2"
+                >
+                  <FileText className="w-5 h-5" />
+                  Ver Documentos
+                </button>
+
+                <button
+                  onClick={() => handleCloseSuccessModal(false)}
+                  className="w-full px-6 py-3 border-2 border-[#009688] text-[#009688] rounded-lg font-semibold hover:bg-[#009688]/5 transition-all"
+                >
+                  Enviar Mais Documentos
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

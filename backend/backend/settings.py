@@ -42,6 +42,7 @@ INSTALLED_APPS = [
     'authentication',  # App de autenticação
     'prontuario',  # App de prontuários
     'documentos',  # App de documentos
+    'assistant',  # App de assistente de IA
 ]
 
 MIDDLEWARE = [

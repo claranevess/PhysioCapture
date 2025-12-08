@@ -395,15 +395,7 @@ def dashboard_statistics(request):
                 'value': round(percentage, 1),
                 'color': colors[idx % len(colors)]
             })
-    else:
-        # Dados de exemplo se não houver prontuários
-        service_distribution = [
-            {'name': 'Consultas', 'value': 35, 'color': '#009688'},
-            {'name': 'Avaliações', 'value': 25, 'color': '#66BB6A'},
-            {'name': 'Procedimentos', 'value': 20, 'color': '#FF8099'},
-            {'name': 'Evoluções', 'value': 15, 'color': '#BA68C8'},
-            {'name': 'Outros', 'value': 5, 'color': '#FFC107'}
-        ]
+    # Se não houver prontuários, serviceDistribution permanece vazio (array [])
     
     return Response({
         'totalPatients': total_patients,
@@ -439,15 +431,25 @@ def dashboard_statistics_gestor(request):
     # if not request.user.is_gestor:
     #     return Response({'error': 'Acesso negado. Apenas gestores.'}, status=status.HTTP_403_FORBIDDEN)
     
-    # Buscar primeira clínica para desenvolvimento (sem autenticação)
+    # Buscar clínica correta para desenvolvimento (sem autenticação)
     from authentication.models import Clinica, User
     try:
         # Tentar usar usuário autenticado se existir
         if request.user.is_authenticated and hasattr(request.user, 'clinica'):
             clinica = request.user.clinica
         else:
-            # Fallback: usar primeira clínica cadastrada
-            clinica = Clinica.objects.first()
+            # Fallback: usar clínica do último usuário logado (por last_login)
+            last_user = User.objects.filter(
+                is_active_user=True, 
+                clinica__isnull=False
+            ).order_by('-last_login').first()
+            
+            if last_user and last_user.clinica:
+                clinica = last_user.clinica
+            else:
+                # Se não houver, usar primeira clínica
+                clinica = Clinica.objects.first()
+                
             if not clinica:
                 return Response(
                     {'error': 'Nenhuma clínica encontrada no sistema'},
@@ -612,14 +614,7 @@ def dashboard_statistics_gestor(request):
                 'value': round(percentage, 1),
                 'color': colors[idx % len(colors)]
             })
-    else:
-        service_distribution = [
-            {'name': 'Consultas', 'value': 35, 'color': '#009688'},
-            {'name': 'Avaliações', 'value': 25, 'color': '#66BB6A'},
-            {'name': 'Procedimentos', 'value': 20, 'color': '#FF8099'},
-            {'name': 'Evoluções', 'value': 15, 'color': '#BA68C8'},
-            {'name': 'Outros', 'value': 5, 'color': '#FFC107'}
-        ]
+    # Se não houver prontuários, serviceDistribution permanece vazio (array [])
     
     return Response({
         'totalPatients': total_patients,
@@ -664,8 +659,11 @@ def dashboard_statistics_fisioterapeuta(request):
         if request.user.is_authenticated and hasattr(request.user, 'clinica'):
             user = request.user
         else:
-            # Fallback: usar primeiro fisioterapeuta cadastrado
-            user = User.objects.filter(user_type='FISIOTERAPEUTA').first()
+            # Fallback: usar último fisioterapeuta logado (por last_login)
+            user = User.objects.filter(
+                user_type='FISIOTERAPEUTA',
+                is_active_user=True
+            ).order_by('-last_login').first()
             if not user:
                 return Response(
                     {'error': 'Nenhum fisioterapeuta encontrado no sistema'},
@@ -811,14 +809,7 @@ def dashboard_statistics_fisioterapeuta(request):
                 'value': round(percentage, 1),
                 'color': colors[idx % len(colors)]
             })
-    else:
-        service_distribution = [
-            {'name': 'Consultas', 'value': 35, 'color': '#009688'},
-            {'name': 'Avaliações', 'value': 25, 'color': '#66BB6A'},
-            {'name': 'Procedimentos', 'value': 20, 'color': '#FF8099'},
-            {'name': 'Evoluções', 'value': 15, 'color': '#BA68C8'},
-            {'name': 'Outros', 'value': 5, 'color': '#FFC107'}
-        ]
+    # Se não houver prontuários, serviceDistribution permanece vazio (array [])
     
     return Response({
         'totalPatients': total_patients,

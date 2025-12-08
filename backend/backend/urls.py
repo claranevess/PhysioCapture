@@ -33,6 +33,9 @@ urlpatterns = [
     # Apps
     path('api/prontuario/', include('prontuario.urls')),
     path('api/documentos/', include('documentos.urls')),
+    
+    # Assistente de IA
+    path('api/', include('assistant.urls')),
 ]
 
 # Servir arquivos de mídia durante o desenvolvimento

@@ -9,11 +9,12 @@ import ArgonLayout from '@/components/Argon/ArgonLayout';
 import { ArgonCard, ArgonStatsCard, ArgonInfoCard } from '@/components/Argon/ArgonCard';
 import { ArgonButton } from '@/components/Argon/ArgonButton';
 import { argonTheme } from '@/lib/argon-theme';
-import { 
-  FileText, 
-  Camera, 
-  Download, 
-  Eye, 
+import DocumentViewerModal from '@/components/UI/DocumentViewerModal';
+import {
+  FileText,
+  Camera,
+  Download,
+  Eye,
   CheckCircle2,
   Filter,
   Search,
@@ -30,6 +31,9 @@ export default function DocumentsPage() {
   const [error, setError] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Estado para modal de visualização
+  const [viewingDoc, setViewingDoc] = useState<Document | null>(null);
 
   useEffect(() => {
     loadData();
@@ -52,16 +56,36 @@ export default function DocumentsPage() {
     }
   };
 
-  const handleDownload = async (docId: number, title: string) => {
+  const handleDownload = async (docId: number, title: string, fileUrl?: string, documentType?: string) => {
     try {
       const response = await apiRoutes.documents.download(docId);
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement('a');
       link.href = url;
-      link.setAttribute('download', title);
+
+      // Extrair o nome do arquivo da URL ou usar o título com extensão
+      let filename = title;
+      if (fileUrl) {
+        // Pegar o nome do arquivo da URL
+        const urlParts = fileUrl.split('/');
+        const originalFilename = urlParts[urlParts.length - 1];
+        if (originalFilename && originalFilename.includes('.')) {
+          filename = originalFilename;
+        } else {
+          // Adicionar extensão baseada no tipo do documento
+          const ext = documentType === 'IMAGE' ? '.jpg' :
+            documentType === 'PDF' ? '.pdf' :
+              documentType === 'DOC' ? '.docx' :
+                documentType === 'EXCEL' ? '.xlsx' : '';
+          filename = title + ext;
+        }
+      }
+
+      link.setAttribute('download', filename);
       document.body.appendChild(link);
       link.click();
       link.remove();
+      window.URL.revokeObjectURL(url);
     } catch (err) {
       alert('Erro ao baixar documento');
     }
@@ -69,9 +93,9 @@ export default function DocumentsPage() {
 
   const filteredDocs = documents.filter(doc => {
     const matchesCategory = selectedCategory ? doc.category === selectedCategory : true;
-    const matchesSearch = searchQuery 
+    const matchesSearch = searchQuery
       ? doc.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (doc.patient_name?.toLowerCase() || '').includes(searchQuery.toLowerCase())
+      (doc.patient_name?.toLowerCase() || '').includes(searchQuery.toLowerCase())
       : true;
     return matchesCategory && matchesSearch;
   });
@@ -81,7 +105,7 @@ export default function DocumentsPage() {
       <ArgonLayout>
         <div className="flex items-center justify-center min-h-[60vh]">
           <div className="text-center">
-            <div 
+            <div
               className="w-16 h-16 mx-auto rounded-full flex items-center justify-center mb-4 animate-pulse"
               style={{ background: argonTheme.gradients.primary }}
             >
@@ -101,22 +125,22 @@ export default function DocumentsPage() {
       <ArgonLayout>
         <ArgonCard className="max-w-md mx-auto p-6">
           <div className="text-center">
-            <div 
+            <div
               className="w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-4"
               style={{ backgroundColor: `${argonTheme.colors.error.main}20` }}
             >
-              <FileText 
+              <FileText
                 className="w-6 h-6"
                 style={{ color: argonTheme.colors.error.main }}
               />
             </div>
-            <h3 
+            <h3
               className="text-lg font-semibold mb-2"
               style={{ color: argonTheme.colors.text.primary }}
             >
               Erro ao carregar
             </h3>
-            <p 
+            <p
               className="text-sm mb-4"
               style={{ color: argonTheme.colors.text.secondary }}
             >
@@ -142,7 +166,7 @@ export default function DocumentsPage() {
         {/* Header with Actions */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 
+            <h1
               className="text-2xl font-bold mb-1"
               style={{ color: argonTheme.colors.text.primary }}
             >
@@ -152,7 +176,7 @@ export default function DocumentsPage() {
               Gerencie e visualize todos os documentos digitalizados
             </p>
           </div>
-          <Link href="/camera">
+          <Link href="/documents/digitize">
             <ArgonButton
               variant="gradient"
               color="primary"
@@ -192,7 +216,7 @@ export default function DocumentsPage() {
             {/* Busca */}
             <div className="flex-1">
               <div className="relative">
-                <Search 
+                <Search
                   className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5"
                   style={{ color: argonTheme.colors.text.secondary }}
                 />
@@ -218,7 +242,7 @@ export default function DocumentsPage() {
             {/* Filtro de Categoria */}
             <div className="sm:w-64">
               <div className="relative">
-                <Filter 
+                <Filter
                   className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5"
                   style={{ color: argonTheme.colors.text.secondary }}
                 />
@@ -278,31 +302,31 @@ export default function DocumentsPage() {
         {/* Grid de Documentos */}
         {filteredDocs.length === 0 ? (
           <ArgonCard className="p-12 text-center">
-            <div 
+            <div
               className="w-20 h-20 mx-auto rounded-full flex items-center justify-center mb-4"
               style={{ backgroundColor: `${argonTheme.colors.primary.main}20` }}
             >
-              <FolderOpen 
+              <FolderOpen
                 className="w-10 h-10"
                 style={{ color: argonTheme.colors.primary.main }}
               />
             </div>
-            <h3 
+            <h3
               className="text-lg font-semibold mb-2"
               style={{ color: argonTheme.colors.text.primary }}
             >
               Nenhum documento encontrado
             </h3>
-            <p 
+            <p
               className="text-sm mb-6"
               style={{ color: argonTheme.colors.text.secondary }}
             >
-              {searchQuery || selectedCategory 
+              {searchQuery || selectedCategory
                 ? 'Tente ajustar os filtros de busca'
                 : 'Comece digitalizando seu primeiro documento'
               }
             </p>
-            <Link href="/camera">
+            <Link href="/documents/digitize">
               <ArgonButton
                 variant="gradient"
                 color="primary"
@@ -317,22 +341,22 @@ export default function DocumentsPage() {
             {filteredDocs.map((doc) => (
               <ArgonCard key={doc.id} hover>
                 {/* Header do Card */}
-                <div 
+                <div
                   className="p-6 border-b"
-                  style={{ 
+                  style={{
                     borderColor: argonTheme.colors.grey[100],
                     background: 'linear-gradient(to right, rgba(245, 247, 250, 1), transparent)'
                   }}
                 >
                   <div className="flex items-start justify-between mb-3">
-                    <div 
+                    <div
                       className="w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0 shadow-md"
                       style={{ background: argonTheme.gradients.primary }}
                     >
                       <FileText className="w-6 h-6 text-white" />
                     </div>
                     {doc.is_verified && (
-                      <span 
+                      <span
                         className="px-3 py-1 text-white text-xs font-semibold rounded-full flex items-center gap-1"
                         style={{ background: argonTheme.gradients.success }}
                       >
@@ -342,7 +366,7 @@ export default function DocumentsPage() {
                     )}
                   </div>
 
-                  <h3 
+                  <h3
                     className="font-semibold mb-1 line-clamp-2"
                     style={{ color: argonTheme.colors.text.primary }}
                   >
@@ -350,7 +374,7 @@ export default function DocumentsPage() {
                   </h3>
 
                   {doc.description && (
-                    <p 
+                    <p
                       className="text-sm line-clamp-2"
                       style={{ color: argonTheme.colors.text.secondary }}
                     >
@@ -362,11 +386,11 @@ export default function DocumentsPage() {
                 {/* Info do Card */}
                 <div className="p-6 space-y-3">
                   <div className="flex items-center gap-2 text-sm">
-                    <User 
+                    <User
                       className="w-4 h-4"
                       style={{ color: argonTheme.colors.text.secondary }}
                     />
-                    <span 
+                    <span
                       className="font-medium"
                       style={{ color: argonTheme.colors.text.primary }}
                     >
@@ -376,7 +400,7 @@ export default function DocumentsPage() {
 
                   {doc.category_name && (
                     <div className="flex items-center gap-2 text-sm">
-                      <FolderOpen 
+                      <FolderOpen
                         className="w-4 h-4"
                         style={{ color: argonTheme.colors.text.secondary }}
                       />
@@ -387,7 +411,7 @@ export default function DocumentsPage() {
                   )}
 
                   <div className="flex items-center gap-2 text-sm">
-                    <Calendar 
+                    <Calendar
                       className="w-4 h-4"
                       style={{ color: argonTheme.colors.text.secondary }}
                     />
@@ -396,11 +420,11 @@ export default function DocumentsPage() {
                     </span>
                   </div>
 
-                  <div 
+                  <div
                     className="pt-3 border-t"
                     style={{ borderColor: argonTheme.colors.grey[100] }}
                   >
-                    <span 
+                    <span
                       className="text-xs"
                       style={{ color: argonTheme.colors.text.secondary }}
                     >
@@ -413,31 +437,42 @@ export default function DocumentsPage() {
                 <div className="p-6 pt-0 flex gap-2">
                   <ArgonButton
                     variant="gradient"
+                    color="success"
+                    size="sm"
+                    icon={<Eye className="w-4 h-4" />}
+                    onClick={() => setViewingDoc(doc)}
+                  >
+                    Visualizar
+                  </ArgonButton>
+                  <ArgonButton
+                    variant="outline"
                     color="primary"
                     size="sm"
                     icon={<Download className="w-4 h-4" />}
-                    onClick={() => handleDownload(doc.id, doc.title)}
-                    fullWidth
+                    onClick={() => handleDownload(doc.id, doc.title, doc.file_url, doc.document_type)}
                   >
-                    Download
+                    Baixar
                   </ArgonButton>
-                  <Link href={`/documents/${doc.id}`} className="flex-1">
-                    <ArgonButton
-                      variant="outline"
-                      color="primary"
-                      size="sm"
-                      icon={<Eye className="w-4 h-4" />}
-                      fullWidth
-                    >
-                      Detalhes
-                    </ArgonButton>
-                  </Link>
                 </div>
               </ArgonCard>
             ))}
           </div>
         )}
       </div>
+
+      {/* Modal de Visualização de Documento */}
+      <DocumentViewerModal
+        isOpen={!!viewingDoc}
+        onClose={() => setViewingDoc(null)}
+        doc={viewingDoc ? {
+          id: viewingDoc.id,
+          title: viewingDoc.title,
+          file_url: viewingDoc.file_url || '',
+          document_type: viewingDoc.document_type,
+        } : null}
+        onDownload={viewingDoc ? () => handleDownload(viewingDoc.id, viewingDoc.title, viewingDoc.file_url, viewingDoc.document_type) : undefined}
+      />
     </ArgonLayout>
   );
 }
+
