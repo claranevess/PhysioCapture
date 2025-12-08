@@ -164,15 +164,29 @@ class DocumentViewSet(viewsets.ModelViewSet):
         """
         Remove um documento e registra no log
         """
-        # Registrar exclusão no log
-        DocumentAccessLog.objects.create(
-            document=instance,
-            user=self.request.user,
-            action='DELETE',
-            ip_address=self.get_client_ip(),
-            user_agent=self.request.META.get('HTTP_USER_AGENT', ''),
-            details={'document_title': instance.title, 'patient': instance.patient.full_name}
-        )
+        # Identificar usuário: prioridade para sessão, depois header X-User-Id
+        user = None
+        if self.request.user.is_authenticated:
+            user = self.request.user
+        else:
+            user_id = self.request.headers.get('X-User-Id')
+            if user_id:
+                from authentication.models import User
+                try:
+                    user = User.objects.get(id=int(user_id), is_active_user=True)
+                except (User.DoesNotExist, ValueError):
+                    pass
+        
+        # Registrar exclusão no log (apenas se houver usuário identificado)
+        if user:
+            DocumentAccessLog.objects.create(
+                document=instance,
+                user=user,
+                action='DELETE',
+                ip_address=self.get_client_ip(),
+                user_agent=self.request.META.get('HTTP_USER_AGENT', ''),
+                details={'document_title': instance.title, 'patient': instance.patient.full_name if instance.patient else None}
+            )
         
         instance.delete()
     

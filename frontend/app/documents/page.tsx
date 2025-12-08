@@ -21,7 +21,8 @@ import {
   Loader2,
   FolderOpen,
   Calendar,
-  User
+  User,
+  Trash2
 } from 'lucide-react';
 
 export default function DocumentsPage() {
@@ -88,6 +89,19 @@ export default function DocumentsPage() {
       window.URL.revokeObjectURL(url);
     } catch (err) {
       alert('Erro ao baixar documento');
+    }
+  };
+
+  const handleDelete = async (docId: number, title: string) => {
+    if (!confirm(`Tem certeza que deseja excluir o documento "${title}"? Esta ação não pode ser desfeita.`)) {
+      return;
+    }
+
+    try {
+      await apiRoutes.documents.delete(docId);
+      setDocuments(docs => docs.filter(d => d.id !== docId));
+    } catch (err) {
+      alert('Erro ao excluir documento');
     }
   };
 
@@ -434,7 +448,7 @@ export default function DocumentsPage() {
                 </div>
 
                 {/* Ações */}
-                <div className="p-6 pt-0 flex gap-2">
+                <div className="p-6 pt-0 flex gap-2 flex-wrap">
                   <ArgonButton
                     variant="gradient"
                     color="success"
@@ -442,7 +456,7 @@ export default function DocumentsPage() {
                     icon={<Eye className="w-4 h-4" />}
                     onClick={() => setViewingDoc(doc)}
                   >
-                    Visualizar
+                    Ver
                   </ArgonButton>
                   <ArgonButton
                     variant="outline"
@@ -452,6 +466,15 @@ export default function DocumentsPage() {
                     onClick={() => handleDownload(doc.id, doc.title, doc.file_url, doc.document_type)}
                   >
                     Baixar
+                  </ArgonButton>
+                  <ArgonButton
+                    variant="outline"
+                    color="error"
+                    size="sm"
+                    icon={<Trash2 className="w-4 h-4" />}
+                    onClick={() => handleDelete(doc.id, doc.title)}
+                  >
+                    Excluir
                   </ArgonButton>
                 </div>
               </ArgonCard>
