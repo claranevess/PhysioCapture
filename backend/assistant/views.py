@@ -13,7 +13,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 
 from physio_ai import ask_physio_assistant
-from physio_ai.local_llm import check_model_status
+from physio_ai.huggingface_llm import check_model_status
 
 # Configuração de logging
 logger = logging.getLogger(__name__)

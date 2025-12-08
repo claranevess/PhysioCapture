@@ -2,9 +2,9 @@
 """
 Physio AI Module
 ================
-Módulo de IA local para o Physio Capture usando llama-cpp-python.
+Módulo de IA para o Physio Capture usando Hugging Face Inference API.
 """
 
-from .local_llm import get_llm, ask_physio_assistant
+from .huggingface_llm import ask_physio_assistant, check_model_status
 
-__all__ = ['get_llm', 'ask_physio_assistant']
+__all__ = ['ask_physio_assistant', 'check_model_status']

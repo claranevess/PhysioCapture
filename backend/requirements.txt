@@ -28,5 +28,8 @@ opencv-python==4.10.0.84
 python-magic==0.4.15 ; sys_platform != 'win32'
 python-magic-bin==0.4.15 ; sys_platform == 'win32'
 
-# Local LLM (Assistente de IA)
-llama-cpp-python
+# Hugging Face (Assistente de IA)
+huggingface_hub
+
+# Environment variables
+python-dotenv
