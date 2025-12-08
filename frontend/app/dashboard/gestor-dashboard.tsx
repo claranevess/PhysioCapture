@@ -2,36 +2,36 @@
 
 import { useEffect, useState } from "react";
 import { apiRoutes } from "@/lib/api";
-import { 
-  ArgonStatsCard, 
+import {
+  ArgonStatsCard,
   ArgonInfoCard,
   ArgonCard
 } from "@/components/Argon/ArgonCard";
 import { argonTheme } from "@/lib/argon-theme";
-import { 
-  Users, 
-  FileText, 
+import {
+  Users,
+  FileText,
   UserPlus,
   TrendingUp,
-  Activity, 
+  Activity,
   BarChart3,
   PieChart,
   Sparkles
 } from 'lucide-react';
-import { 
-  AreaChart, 
-  Area, 
-  BarChart, 
-  Bar, 
-  PieChart as RechartsPie, 
-  Pie, 
-  Cell, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
-  Legend, 
-  ResponsiveContainer 
+import {
+  AreaChart,
+  Area,
+  BarChart,
+  Bar,
+  PieChart as RechartsPie,
+  Pie,
+  Cell,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer
 } from 'recharts';
 
 interface GestorDashboardProps {
@@ -73,7 +73,7 @@ export default function GestorDashboard({ currentUser }: GestorDashboardProps) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <div className="text-center">
-          <div 
+          <div
             className="w-16 h-16 mx-auto rounded-full flex items-center justify-center mb-4 animate-pulse"
             style={{ background: argonTheme.gradients.primary }}
           >
@@ -164,86 +164,87 @@ export default function GestorDashboard({ currentUser }: GestorDashboardProps) {
               <AreaChart data={stats.monthlyTrend}>
                 <defs>
                   <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#009688" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="#009688" stopOpacity={0}/>
+                    <stop offset="5%" stopColor="#009688" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="#009688" stopOpacity={0} />
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                <XAxis 
-                  dataKey="month" 
+                <XAxis
+                  dataKey="month"
                   stroke={argonTheme.colors.text.secondary}
-                  style={{ fontSize: '12px' }} 
+                  style={{ fontSize: '12px' }}
                 />
-                <YAxis 
+                <YAxis
                   stroke={argonTheme.colors.text.secondary}
-                  style={{ fontSize: '12px' }} 
+                  style={{ fontSize: '12px' }}
                 />
-                <Tooltip 
-                  contentStyle={{ 
-                    backgroundColor: 'white', 
-                    border: '1px solid #e0e0e0', 
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: 'white',
+                    border: '1px solid #e0e0e0',
                     borderRadius: '12px',
                     boxShadow: argonTheme.shadows.lg,
-                  }} 
+                  }}
                 />
-                <Area 
-                  type="monotone" 
-                  dataKey="value" 
+                <Area
+                  type="monotone"
+                  dataKey="value"
                   stroke={argonTheme.colors.primary.main}
                   strokeWidth={3}
-                  fillOpacity={1} 
-                  fill="url(#colorValue)" 
+                  fillOpacity={1}
+                  fill="url(#colorValue)"
                 />
               </AreaChart>
             </ResponsiveContainer>
           </ArgonInfoCard>
         </div>
 
-        {/* Pie Chart - Distribuição */}
+        {/* Métricas dos Fisioterapeutas */}
         <ArgonInfoCard
-          title="Distribuição de Serviços"
-          subtitle="Por especialidade"
-          icon={<PieChart className="w-5 h-5" />}
+          title="Equipe de Fisioterapeutas"
+          subtitle="Desempenho e pacientes"
+          icon={<Users className="w-5 h-5" />}
           iconGradient="secondary"
         >
-          <ResponsiveContainer width="100%" height={240}>
-            <RechartsPie>
-              <Pie
-                data={stats.serviceDistribution}
-                cx="50%"
-                cy="50%"
-                innerRadius={60}
-                outerRadius={80}
-                paddingAngle={5}
-                dataKey="value"
-              >
-                {stats.serviceDistribution.map((entry: any, index: number) => (
-                  <Cell key={`cell-${index}`} fill={entry.color} />
-                ))}
-              </Pie>
-              <Tooltip />
-            </RechartsPie>
-          </ResponsiveContainer>
-          <div className="mt-4 space-y-2">
-            {stats.serviceDistribution.map((item: any, index: number) => (
-              <div key={index} className="flex items-center justify-between text-sm">
-                <div className="flex items-center gap-2">
-                  <div 
-                    className="w-3 h-3 rounded-full" 
-                    style={{ backgroundColor: item.color }}
-                  />
-                  <span style={{ color: argonTheme.colors.text.primary }}>
-                    {item.name}
-                  </span>
-                </div>
-                <span 
-                  className="font-semibold"
-                  style={{ color: argonTheme.colors.text.primary }}
+          <div className="space-y-3">
+            {stats.fisioterapeutasMetrics && stats.fisioterapeutasMetrics.length > 0 ? (
+              stats.fisioterapeutasMetrics.map((fisio: any, index: number) => (
+                <div
+                  key={index}
+                  className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
                 >
-                  {item.value}%
-                </span>
+                  <div className="flex items-center gap-3">
+                    <div
+                      className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold"
+                      style={{ background: argonTheme.gradients.primary }}
+                    >
+                      {fisio.name?.charAt(0) || 'F'}
+                    </div>
+                    <div>
+                      <p className="font-medium" style={{ color: argonTheme.colors.text.primary }}>
+                        {fisio.name || 'Fisioterapeuta'}
+                      </p>
+                      <p className="text-xs" style={{ color: argonTheme.colors.text.secondary }}>
+                        {fisio.specialty || 'Fisioterapia Geral'}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-lg font-bold" style={{ color: argonTheme.colors.primary.main }}>
+                      {fisio.patients || 0}
+                    </p>
+                    <p className="text-xs" style={{ color: argonTheme.colors.text.secondary }}>
+                      pacientes
+                    </p>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="text-center py-6 text-gray-400">
+                <Users className="w-12 h-12 mx-auto mb-2 opacity-30" />
+                <p>Nenhum fisioterapeuta cadastrado</p>
               </div>
-            ))}
+            )}
           </div>
         </ArgonInfoCard>
       </div>
@@ -258,22 +259,22 @@ export default function GestorDashboard({ currentUser }: GestorDashboardProps) {
         <ResponsiveContainer width="100%" height={280}>
           <BarChart data={stats.weeklyData}>
             <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-            <XAxis 
-              dataKey="day" 
+            <XAxis
+              dataKey="day"
               stroke={argonTheme.colors.text.secondary}
-              style={{ fontSize: '12px' }} 
+              style={{ fontSize: '12px' }}
             />
-            <YAxis 
+            <YAxis
               stroke={argonTheme.colors.text.secondary}
-              style={{ fontSize: '12px' }} 
+              style={{ fontSize: '12px' }}
             />
-            <Tooltip 
-              contentStyle={{ 
-                backgroundColor: 'white', 
-                border: '1px solid #e0e0e0', 
+            <Tooltip
+              contentStyle={{
+                backgroundColor: 'white',
+                border: '1px solid #e0e0e0',
                 borderRadius: '12px',
                 boxShadow: argonTheme.shadows.lg,
-              }} 
+              }}
             />
             <Legend />
             <Bar dataKey="pacientes" fill="#009688" radius={[8, 8, 0, 0]} />
@@ -295,25 +296,25 @@ export default function GestorDashboard({ currentUser }: GestorDashboardProps) {
             <table className="w-full">
               <thead>
                 <tr className="border-b border-gray-200">
-                  <th 
+                  <th
                     className="text-left py-3 px-4 font-semibold text-sm"
                     style={{ color: argonTheme.colors.text.secondary }}
                   >
                     Fisioterapeuta
                   </th>
-                  <th 
+                  <th
                     className="text-center py-3 px-4 font-semibold text-sm"
                     style={{ color: argonTheme.colors.text.secondary }}
                   >
                     Pacientes
                   </th>
-                  <th 
+                  <th
                     className="text-center py-3 px-4 font-semibold text-sm"
                     style={{ color: argonTheme.colors.text.secondary }}
                   >
                     Consultas
                   </th>
-                  <th 
+                  <th
                     className="text-center py-3 px-4 font-semibold text-sm"
                     style={{ color: argonTheme.colors.text.secondary }}
                   >
@@ -324,25 +325,25 @@ export default function GestorDashboard({ currentUser }: GestorDashboardProps) {
               <tbody>
                 {stats.fisioterapeutasMetrics.map((fisio: any) => (
                   <tr key={fisio.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
-                    <td 
+                    <td
                       className="py-3 px-4 font-medium"
                       style={{ color: argonTheme.colors.text.primary }}
                     >
                       {fisio.name}
                     </td>
-                    <td 
+                    <td
                       className="py-3 px-4 text-center font-semibold"
                       style={{ color: argonTheme.colors.primary.main }}
                     >
                       {fisio.pacientes}
                     </td>
-                    <td 
+                    <td
                       className="py-3 px-4 text-center font-semibold"
                       style={{ color: argonTheme.colors.success.main }}
                     >
                       {fisio.consultas}
                     </td>
-                    <td 
+                    <td
                       className="py-3 px-4 text-center font-semibold"
                       style={{ color: argonTheme.colors.error.main }}
                     >

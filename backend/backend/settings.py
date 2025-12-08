@@ -46,6 +46,7 @@ INSTALLED_APPS = [
     'authentication',  # App de autenticação
     'prontuario',  # App de prontuários
     'documentos',  # App de documentos
+    'estoque',  # App de gestão de estoque
     'assistant',  # App de assistente de IA
 ]
 
@@ -189,6 +190,7 @@ CORS_ALLOW_HEADERS = [
     'user-agent',
     'x-csrftoken',
     'x-requested-with',
+    'x-user-id',  # Custom header para identificar usuário logado
 ]
 
 # --- Configuração do Django REST Framework ---

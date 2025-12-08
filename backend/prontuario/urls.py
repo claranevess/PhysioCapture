@@ -3,6 +3,9 @@ from rest_framework.routers import DefaultRouter
 from .views import (
     PatientViewSet, 
     MedicalRecordViewSet, 
+    TreatmentPlanViewSet,
+    PhysioSessionViewSet,
+    DischargeViewSet,
     dashboard_statistics,
     dashboard_statistics_gestor,
     dashboard_statistics_fisioterapeuta
@@ -11,6 +14,9 @@ from .views import (
 router = DefaultRouter()
 router.register(r'patients', PatientViewSet, basename='patient')
 router.register(r'medical-records', MedicalRecordViewSet, basename='medical-record')
+router.register(r'treatment-plans', TreatmentPlanViewSet, basename='treatment-plan')
+router.register(r'sessions', PhysioSessionViewSet, basename='session')
+router.register(r'discharges', DischargeViewSet, basename='discharge')
 
 urlpatterns = [
     path('', include(router.urls)),
@@ -18,3 +24,4 @@ urlpatterns = [
     path('dashboard-stats/gestor/', dashboard_statistics_gestor, name='dashboard-statistics-gestor'),
     path('dashboard-stats/fisioterapeuta/', dashboard_statistics_fisioterapeuta, name='dashboard-statistics-fisioterapeuta'),
 ]
+

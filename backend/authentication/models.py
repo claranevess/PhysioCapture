@@ -50,8 +50,9 @@ class User(AbstractUser):
     """
     USUÁRIOS DO SISTEMA - Apenas quem pode fazer LOGIN
     
-    GESTOR: Gerencia a clínica, cadastra fisioterapeutas
-    FISIOTERAPEUTA: Atende pacientes, gerencia prontuários
+    GESTOR: Gerencia a clínica, cadastra fisioterapeutas, acessa relatórios globais
+    FISIOTERAPEUTA: Atende pacientes, gerencia prontuários clínicos
+    ATENDENTE: Recepção, agenda, cadastro básico de pacientes
     
     IMPORTANTE: Pacientes NÃO são usuários! São apenas registros de dados.
     """
@@ -59,10 +60,7 @@ class User(AbstractUser):
     USER_TYPE_CHOICES = [
         ('GESTOR', 'Gestor da Clínica'),
         ('FISIOTERAPEUTA', 'Fisioterapeuta'),
-    ]
-    USER_TYPE_CHOICES = [
-        ('GESTOR', 'Gestor da Clínica'),
-        ('FISIOTERAPEUTA', 'Fisioterapeuta'),
+        ('ATENDENTE', 'Atendente/Recepção'),
     ]
     
     # TENANT - Cada usuário pertence a uma clínica
@@ -128,15 +126,15 @@ class User(AbstractUser):
         verbose_name = 'Usuário'
         verbose_name_plural = 'Usuários'
         ordering = ['-created_at']
-        # Um CPF pode existir em múltiplas clínicas (improvável, mas possível)
-        # Mas username deve ser único globalmente
     
     def __str__(self):
         return f"{self.get_full_name() or self.username} ({self.get_user_type_display()}) - {self.clinica.nome}"
     
+    # ==================== PROPRIEDADES DE PAPEL ====================
+    
     @property
     def is_gestor(self):
-        """Gestor da clínica - pode gerenciar fisioterapeutas"""
+        """Gestor da clínica - pode gerenciar tudo"""
         return self.user_type == 'GESTOR'
     
     @property
@@ -144,8 +142,39 @@ class User(AbstractUser):
         """Fisioterapeuta - atende pacientes"""
         return self.user_type == 'FISIOTERAPEUTA'
     
+    @property
+    def is_atendente(self):
+        """Atendente/Recepção - gerencia agenda e cadastros básicos"""
+        return self.user_type == 'ATENDENTE'
+    
+    # ==================== MÉTODOS DE PERMISSÃO ====================
+    
     def can_manage_users(self):
         """Apenas gestores podem criar/editar usuários"""
+        return self.is_gestor
+    
+    def can_access_clinical_data(self):
+        """
+        Verifica se pode acessar dados clínicos detalhados
+        - Gestor e Fisioterapeuta: SIM
+        - Atendente: NÃO
+        """
+        return self.is_gestor or self.is_fisioterapeuta
+    
+    def can_manage_schedule(self):
+        """
+        Verifica se pode gerenciar agenda/sessões
+        - Gestor e Atendente: podem criar/editar/cancelar sessões
+        - Fisioterapeuta: apenas visualiza sua própria agenda
+        """
+        return self.is_gestor or self.is_atendente
+    
+    def can_manage_inventory(self):
+        """Apenas gestores podem gerenciar estoque"""
+        return self.is_gestor
+    
+    def can_view_reports(self):
+        """Apenas gestores podem ver relatórios globais"""
         return self.is_gestor
     
     def can_access_patient(self, paciente):
@@ -153,17 +182,37 @@ class User(AbstractUser):
         Verifica se o usuário pode acessar um paciente
         - Gestor: acessa todos os pacientes da sua clínica
         - Fisioterapeuta: acessa apenas seus próprios pacientes
+        - Atendente: acessa dados básicos de todos os pacientes (não clínicos)
         """
+        # Sempre verificar se pertence à mesma clínica
         if self.clinica_id != paciente.clinica_id:
             return False
         
+        # Gestor acessa todos
         if self.is_gestor:
             return True
         
+        # Fisioterapeuta acessa apenas seus pacientes
         if self.is_fisioterapeuta:
             return paciente.fisioterapeuta_id == self.id
         
+        # Atendente acessa todos (mas apenas dados básicos, não clínicos)
+        if self.is_atendente:
+            return True
+        
         return False
+    
+    def can_access_patient_clinical_data(self, paciente):
+        """
+        Verifica se pode acessar dados CLÍNICOS de um paciente
+        - Gestor: acessa todos
+        - Fisioterapeuta: apenas seus pacientes
+        - Atendente: NUNCA
+        """
+        if not self.can_access_clinical_data():
+            return False
+        
+        return self.can_access_patient(paciente)
 
 
 class Lead(models.Model):

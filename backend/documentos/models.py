@@ -95,6 +95,13 @@ class Document(models.Model):
     # Status
     is_active = models.BooleanField(default=True, verbose_name="Ativo")
     is_verified = models.BooleanField(default=False, verbose_name="Verificado")
+    
+    # Controle de acesso para papéis
+    is_administrative = models.BooleanField(
+        default=False, 
+        verbose_name="Documento Administrativo",
+        help_text="Se marcado, atendentes podem visualizar este documento"
+    )
 
     class Meta:
         ordering = ['-created_at']

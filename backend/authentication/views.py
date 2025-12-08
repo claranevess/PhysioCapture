@@ -117,29 +117,37 @@ def logout_user(request):
 
 
 @api_view(['GET'])
-@permission_classes([AllowAny])  # SEM AUTENTICAÇÃO - APENAS DESENVOLVIMENTO
+@permission_classes([AllowAny])
 def current_user(request):
     """
     Retorna informações do usuário logado
     GET /api/auth/me/
     
-    DESENVOLVIMENTO: Retorna o primeiro gestor ativo (consistente com outros endpoints)
+    Usa a sessão do Django para identificar o usuário atual.
+    Fallback: dados no localStorage do frontend (enviados no header).
     """
-    # Para desenvolvimento: retornar primeiro gestor ativo para consistência
-    try:
-        # Priorizar gestor para consistência com dashboard e outras APIs
-        user = User.objects.filter(user_type='GESTOR', is_active_user=True).order_by('id').first()
-        if not user:
-            # Fallback: qualquer usuário ativo
-            user = User.objects.filter(is_active_user=True).order_by('id').first()
-        
-        if not user:
-            return Response({'error': 'Nenhum usuário encontrado'}, status=404)
-        
+    # Prioridade 1: Sessão Django autenticada
+    if request.user.is_authenticated:
+        serializer = UserProfileSerializer(request.user)
+        return Response(serializer.data)
+    
+    # Prioridade 2: Header X-User-Id enviado pelo frontend
+    user_id = request.headers.get('X-User-Id')
+    if user_id:
+        try:
+            user = User.objects.get(id=int(user_id), is_active_user=True)
+            serializer = UserProfileSerializer(user)
+            return Response(serializer.data)
+        except (User.DoesNotExist, ValueError):
+            pass
+    
+    # Fallback para desenvolvimento: primeiro usuário ativo
+    user = User.objects.filter(is_active_user=True).order_by('id').first()
+    if user:
         serializer = UserProfileSerializer(user)
         return Response(serializer.data)
-    except Exception as e:
-        return Response({'error': str(e)}, status=500)
+    
+    return Response({'error': 'Nenhum usuário encontrado'}, status=status.HTTP_404_NOT_FOUND)
 
 
 @api_view(['PUT', 'PATCH'])

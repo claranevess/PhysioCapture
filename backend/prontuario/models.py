@@ -174,3 +174,272 @@ class MedicalRecordHistory(models.Model):
 
     def __str__(self):
         return f"{self.get_action_display()} - {self.medical_record.patient.full_name} - {self.timestamp.strftime('%d/%m/%Y %H:%M')}"
+
+
+# ==================== NOVOS MODELOS - FASE 1 ====================
+
+class TreatmentPlan(models.Model):
+    """
+    Plano de tratamento do paciente
+    Define objetivos, frequência e quantidade de sessões planejadas
+    """
+    STATUS_CHOICES = [
+        ('ATIVO', 'Ativo'),
+        ('CONCLUIDO', 'Concluído'),
+        ('CANCELADO', 'Cancelado'),
+    ]
+    
+    FREQUENCY_CHOICES = [
+        ('1x_semana', '1x por semana'),
+        ('2x_semana', '2x por semana'),
+        ('3x_semana', '3x por semana'),
+        ('4x_semana', '4x por semana'),
+        ('5x_semana', '5x por semana'),
+        ('diario', 'Diário'),
+        ('sob_demanda', 'Sob demanda'),
+    ]
+    
+    # Relacionamentos
+    patient = models.ForeignKey(
+        Patient, 
+        on_delete=models.CASCADE, 
+        related_name='treatment_plans',
+        verbose_name="Paciente"
+    )
+    fisioterapeuta = models.ForeignKey(
+        settings.AUTH_USER_MODEL, 
+        on_delete=models.PROTECT,
+        related_name='treatment_plans_created',
+        verbose_name="Fisioterapeuta Responsável"
+    )
+    clinica = models.ForeignKey(
+        'authentication.Clinica', 
+        on_delete=models.CASCADE,
+        related_name='treatment_plans',
+        verbose_name="Clínica"
+    )
+    
+    # Avaliação inicial vinculada (opcional)
+    initial_evaluation = models.ForeignKey(
+        MedicalRecord,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='treatment_plans',
+        verbose_name="Avaliação Inicial"
+    )
+    
+    # Objetivos e descrição
+    title = models.CharField(max_length=200, verbose_name="Título do Plano")
+    objectives = models.TextField(verbose_name="Objetivos do Tratamento")
+    diagnosis = models.TextField(blank=True, verbose_name="Diagnóstico Fisioterapêutico")
+    
+    # Planejamento de sessões
+    total_sessions = models.IntegerField(verbose_name="Total de Sessões Planejadas")
+    frequency = models.CharField(
+        max_length=20, 
+        choices=FREQUENCY_CHOICES, 
+        default='2x_semana',
+        verbose_name="Frequência"
+    )
+    session_duration_minutes = models.IntegerField(default=50, verbose_name="Duração por Sessão (min)")
+    
+    # Status e datas
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='ATIVO', verbose_name="Status")
+    start_date = models.DateField(verbose_name="Data de Início")
+    expected_end_date = models.DateField(null=True, blank=True, verbose_name="Previsão de Término")
+    actual_end_date = models.DateField(null=True, blank=True, verbose_name="Data de Término Real")
+    
+    # Observações
+    observations = models.TextField(blank=True, verbose_name="Observações Gerais")
+    
+    # Controle
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Criado em")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="Atualizado em")
+    
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = "Plano de Tratamento"
+        verbose_name_plural = "Planos de Tratamento"
+    
+    def __str__(self):
+        return f"{self.title} - {self.patient.full_name} ({self.get_status_display()})"
+    
+    @property
+    def completed_sessions_count(self):
+        """Conta quantas sessões foram realizadas"""
+        return self.sessions.filter(status='REALIZADA').count()
+    
+    @property
+    def progress_percentage(self):
+        """Retorna a porcentagem de progresso do tratamento"""
+        if self.total_sessions == 0:
+            return 0
+        return int((self.completed_sessions_count / self.total_sessions) * 100)
+
+
+class PhysioSession(models.Model):
+    """
+    Sessão de fisioterapia
+    Representa uma sessão individual de atendimento
+    """
+    STATUS_CHOICES = [
+        ('AGENDADA', 'Agendada'),
+        ('CONFIRMADA', 'Confirmada'),
+        ('EM_ANDAMENTO', 'Em Andamento'),
+        ('REALIZADA', 'Realizada'),
+        ('CANCELADA', 'Cancelada'),
+        ('FALTA', 'Falta do Paciente'),
+        ('REMARCADA', 'Remarcada'),
+    ]
+    
+    # Relacionamentos principais
+    patient = models.ForeignKey(
+        Patient, 
+        on_delete=models.CASCADE, 
+        related_name='sessions',
+        verbose_name="Paciente"
+    )
+    fisioterapeuta = models.ForeignKey(
+        settings.AUTH_USER_MODEL, 
+        on_delete=models.PROTECT,
+        related_name='sessions_as_therapist',
+        verbose_name="Fisioterapeuta"
+    )
+    clinica = models.ForeignKey(
+        'authentication.Clinica', 
+        on_delete=models.CASCADE,
+        related_name='sessions',
+        verbose_name="Clínica"
+    )
+    treatment_plan = models.ForeignKey(
+        TreatmentPlan, 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True,
+        related_name='sessions',
+        verbose_name="Plano de Tratamento"
+    )
+    
+    # Agendamento
+    scheduled_date = models.DateField(verbose_name="Data Agendada")
+    scheduled_time = models.TimeField(verbose_name="Horário Agendado")
+    duration_minutes = models.IntegerField(default=50, verbose_name="Duração (minutos)")
+    
+    # Status e controle
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='AGENDADA', verbose_name="Status")
+    session_number = models.IntegerField(null=True, blank=True, verbose_name="Número da Sessão")
+    
+    # Registro clínico (preenchido após/durante a sessão)
+    procedures = models.TextField(blank=True, verbose_name="Procedimentos Realizados")
+    evolution = models.TextField(blank=True, verbose_name="Evolução do Quadro")
+    pain_scale_before = models.IntegerField(null=True, blank=True, verbose_name="Escala de Dor (Antes)")
+    pain_scale_after = models.IntegerField(null=True, blank=True, verbose_name="Escala de Dor (Depois)")
+    observations = models.TextField(blank=True, verbose_name="Observações")
+    
+    # Horário real de atendimento
+    actual_start_time = models.TimeField(null=True, blank=True, verbose_name="Hora Início Real")
+    actual_end_time = models.TimeField(null=True, blank=True, verbose_name="Hora Término Real")
+    
+    # Controle de criação
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Criado em")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="Atualizado em")
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        related_name='sessions_created',
+        verbose_name="Criado por"
+    )
+    
+    class Meta:
+        ordering = ['-scheduled_date', '-scheduled_time']
+        verbose_name = "Sessão de Fisioterapia"
+        verbose_name_plural = "Sessões de Fisioterapia"
+    
+    def __str__(self):
+        session_info = f"#{self.session_number}" if self.session_number else ""
+        return f"Sessão {session_info} - {self.patient.full_name} ({self.scheduled_date.strftime('%d/%m/%Y')} {self.scheduled_time.strftime('%H:%M')})"
+    
+    @property
+    def is_today(self):
+        """Verifica se a sessão é hoje"""
+        from datetime import date
+        return self.scheduled_date == date.today()
+    
+    @property
+    def can_be_edited(self):
+        """Verifica se a sessão ainda pode ser editada"""
+        return self.status in ['AGENDADA', 'CONFIRMADA']
+
+
+class Discharge(models.Model):
+    """
+    Registro de alta/encerramento do tratamento
+    Documenta o motivo e avaliação final do tratamento
+    """
+    REASON_CHOICES = [
+        ('MELHORA', 'Alta por Melhora'),
+        ('CURA', 'Alta por Cura'),
+        ('ABANDONO', 'Abandono do Tratamento'),
+        ('ENCAMINHAMENTO', 'Encaminhamento para Outro Profissional'),
+        ('TRANSFERENCIA', 'Transferência de Clínica'),
+        ('OBITO', 'Óbito'),
+        ('OUTRO', 'Outro Motivo'),
+    ]
+    
+    # Relacionamentos
+    patient = models.ForeignKey(
+        Patient, 
+        on_delete=models.CASCADE, 
+        related_name='discharges',
+        verbose_name="Paciente"
+    )
+    fisioterapeuta = models.ForeignKey(
+        settings.AUTH_USER_MODEL, 
+        on_delete=models.PROTECT,
+        related_name='discharges_given',
+        verbose_name="Fisioterapeuta Responsável"
+    )
+    treatment_plan = models.ForeignKey(
+        TreatmentPlan, 
+        on_delete=models.SET_NULL, 
+        null=True,
+        blank=True,
+        related_name='discharges',
+        verbose_name="Plano de Tratamento"
+    )
+    clinica = models.ForeignKey(
+        'authentication.Clinica', 
+        on_delete=models.CASCADE,
+        related_name='discharges',
+        verbose_name="Clínica"
+    )
+    
+    # Informações da alta
+    reason = models.CharField(max_length=20, choices=REASON_CHOICES, verbose_name="Motivo da Alta")
+    reason_details = models.TextField(blank=True, verbose_name="Detalhes do Motivo")
+    discharge_date = models.DateField(verbose_name="Data da Alta")
+    
+    # Avaliação final
+    final_evaluation = models.TextField(verbose_name="Avaliação Final")
+    initial_condition = models.TextField(blank=True, verbose_name="Condição Inicial")
+    final_condition = models.TextField(blank=True, verbose_name="Condição Final")
+    treatment_summary = models.TextField(blank=True, verbose_name="Resumo do Tratamento")
+    
+    # Recomendações
+    recommendations = models.TextField(blank=True, verbose_name="Recomendações ao Paciente")
+    follow_up_instructions = models.TextField(blank=True, verbose_name="Instruções de Acompanhamento")
+    
+    # Controle
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Criado em")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="Atualizado em")
+    
+    class Meta:
+        ordering = ['-discharge_date']
+        verbose_name = "Alta/Encerramento"
+        verbose_name_plural = "Altas/Encerramentos"
+    
+    def __str__(self):
+        return f"Alta - {self.patient.full_name} ({self.discharge_date.strftime('%d/%m/%Y')}) - {self.get_reason_display()}"
+

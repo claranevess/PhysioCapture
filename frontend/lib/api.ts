@@ -10,6 +10,27 @@ export const api = axios.create({
   withCredentials: true, // Habilitado para enviar cookies de sessão Django
 });
 
+// Interceptor para adicionar ID do usuário logado (do localStorage)
+api.interceptors.request.use(
+  (config) => {
+    if (typeof window !== 'undefined') {
+      const userStr = localStorage.getItem('user');
+      if (userStr) {
+        try {
+          const user = JSON.parse(userStr);
+          if (user?.id) {
+            config.headers['X-User-Id'] = user.id.toString();
+          }
+        } catch (e) {
+          // Ignora erro de parse
+        }
+      }
+    }
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
+
 // Interceptor para tratar erros de autenticação
 api.interceptors.response.use(
   (response) => response,

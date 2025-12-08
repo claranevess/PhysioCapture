@@ -33,6 +33,7 @@ urlpatterns = [
     # Apps
     path('api/prontuario/', include('prontuario.urls')),
     path('api/documentos/', include('documentos.urls')),
+    path('api/estoque/', include('estoque.urls')),
     
     # Assistente de IA
     path('api/', include('assistant.urls')),

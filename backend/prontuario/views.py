@@ -40,25 +40,34 @@ class PatientViewSet(viewsets.ModelViewSet):
     
     def get_queryset(self):
         queryset = super().get_queryset()
-        user = self.request.user
         
-        # 🚧 DESENVOLVIMENTO: RBAC desabilitado temporariamente
-        # TODO: Reabilitar filtros de segurança em produção
+        # Identificar usuário: prioridade para sessão, depois header X-User-Id
+        user = None
+        if self.request.user.is_authenticated:
+            user = self.request.user
+        else:
+            # Tentar pegar do header X-User-Id
+            user_id = self.request.headers.get('X-User-Id')
+            if user_id:
+                from authentication.models import User
+                try:
+                    user = User.objects.get(id=int(user_id), is_active_user=True)
+                except (User.DoesNotExist, ValueError):
+                    pass
         
-        # Para desenvolvimento: simular primeiro gestor ativo se não houver usuário autenticado
-        if not user.is_authenticated or not hasattr(user, 'clinica'):
+        # Fallback: primeiro gestor ativo
+        if not user:
             from authentication.models import User
             user = User.objects.filter(user_type='GESTOR', is_active_user=True).order_by('id').first()
         
-        # RBAC: Filtrar por clínica e papel do usuário
+        # Filtrar por clínica
         if user and hasattr(user, 'clinica') and user.clinica:
-            # Filtrar pela clínica do usuário (Multi-Tenant)
             queryset = queryset.filter(clinica=user.clinica)
             
-            # Se for fisioterapeuta, mostrar apenas seus pacientes
-            if hasattr(user, 'is_fisioterapeuta') and user.is_fisioterapeuta:
+            # FISIOTERAPEUTA: ver apenas SEUS pacientes
+            if user.user_type == 'FISIOTERAPEUTA':
                 queryset = queryset.filter(fisioterapeuta=user)
-            # Se for gestor, mostra todos os pacientes da clínica (já filtrado acima)
+            # ATENDENTE e GESTOR: ver todos os pacientes da clínica
         
         # Filtrar por status ativo
         is_active = self.request.query_params.get('is_active', None)
@@ -538,30 +547,39 @@ def dashboard_statistics_gestor(request):
             'documentos': documentos_count
         })
     
-    # Dados semanais (últimos 7 dias) - da clínica
+    # Dados semanais (semana atual: Seg-Dom) - da clínica
+    from .models import PhysioSession
     weekly_data = []
-    days_pt = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
+    days_pt = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom']
     
-    for i in range(6, -1, -1):
-        day = today - timedelta(days=i)
-        day_name = days_pt[day.weekday()]
+    # Calcular a segunda-feira da semana atual
+    days_since_monday = today.weekday()  # 0 = segunda, 6 = domingo
+    monday_of_week = today - timedelta(days=days_since_monday)
+    
+    for i in range(7):  # Seg (0) até Dom (6)
+        day = monday_of_week + timedelta(days=i)
+        day_name = days_pt[i]
         
         patients_count = patients_clinica.filter(created_at__date=day).count()
-        records_count = MedicalRecord.objects.filter(
+        
+        # Contar documentos reais (Document), não prontuários
+        documents_count = Document.objects.filter(
             patient__clinica=clinica,
-            record_date__date=day
+            created_at__date=day
         ).count()
-        consultations = MedicalRecord.objects.filter(
-            patient__clinica=clinica,
-            record_date__date=day,
-            record_type='CONSULTA'
+        
+        # Contar sessões realizadas neste dia
+        sessions_count = PhysioSession.objects.filter(
+            clinica=clinica,
+            scheduled_date=day,
+            status='REALIZADA'
         ).count()
         
         weekly_data.append({
             'day': day_name,
             'pacientes': patients_count,
-            'consultas': consultations,
-            'documentos': records_count
+            'consultas': sessions_count,
+            'documentos': documents_count
         })
     
     # Tendência mensal (últimos 8 meses)
@@ -652,28 +670,33 @@ def dashboard_statistics_fisioterapeuta(request):
     # if not request.user.is_fisioterapeuta:
     #     return Response({'error': 'Acesso negado. Apenas fisioterapeutas.'}, status=status.HTTP_403_FORBIDDEN)
     
-    # Buscar primeiro fisioterapeuta para desenvolvimento (sem autenticação)
+    # Identificar usuário: prioridade para sessão, depois header X-User-Id
     from authentication.models import User
-    try:
-        # Tentar usar usuário autenticado se existir
-        if request.user.is_authenticated and hasattr(request.user, 'clinica'):
-            user = request.user
-        else:
-            # Fallback: usar último fisioterapeuta logado (por last_login)
-            user = User.objects.filter(
-                user_type='FISIOTERAPEUTA',
-                is_active_user=True
-            ).order_by('-last_login').first()
-            if not user:
-                return Response(
-                    {'error': 'Nenhum fisioterapeuta encontrado no sistema'},
-                    status=status.HTTP_404_NOT_FOUND
-                )
-    except Exception as e:
-        return Response(
-            {'error': f'Erro ao buscar usuário: {str(e)}'},
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
+    user = None
+    
+    if request.user.is_authenticated:
+        user = request.user
+    else:
+        # Tentar pegar do header X-User-Id
+        user_id = request.headers.get('X-User-Id')
+        if user_id:
+            try:
+                user = User.objects.get(id=int(user_id), is_active_user=True)
+            except (User.DoesNotExist, ValueError):
+                pass
+    
+    # Fallback para desenvolvimento: primeiro fisioterapeuta ativo
+    if not user or user.user_type != 'FISIOTERAPEUTA':
+        user = User.objects.filter(
+            user_type='FISIOTERAPEUTA',
+            is_active_user=True
+        ).order_by('id').first()
+        
+        if not user:
+            return Response(
+                {'error': 'Nenhum fisioterapeuta encontrado no sistema'},
+                status=status.HTTP_404_NOT_FOUND
+            )
     
     today = timezone.now().date()
     
@@ -811,6 +834,27 @@ def dashboard_statistics_fisioterapeuta(request):
             })
     # Se não houver prontuários, serviceDistribution permanece vazio (array [])
     
+    # Próximas consultas do dia
+    upcoming_sessions = []
+    try:
+        today_sessions = PhysioSession.objects.filter(
+            fisioterapeuta=user,
+            scheduled_date=today,
+            status__in=['AGENDADA', 'CONFIRMADA']
+        ).order_by('scheduled_time')[:5]
+        
+        for session in today_sessions:
+            upcoming_sessions.append({
+                'id': session.id,
+                'patient_name': session.patient.full_name if session.patient else 'Paciente',
+                'scheduled_time': session.scheduled_time.strftime('%H:%M') if session.scheduled_time else None,
+                'duration_minutes': session.duration_minutes,
+                'status': session.status,
+                'status_display': session.get_status_display() if hasattr(session, 'get_status_display') else session.status
+            })
+    except Exception:
+        pass
+    
     return Response({
         'totalPatients': total_patients,
         'documentsToday': documents_today,
@@ -820,5 +864,330 @@ def dashboard_statistics_fisioterapeuta(request):
         'recentPatients': recent_patients_data,
         'weeklyData': weekly_data,
         'monthlyTrend': monthly_trend,
-        'serviceDistribution': service_distribution
+        'serviceDistribution': service_distribution,
+        'upcomingSessions': upcoming_sessions
     })
+
+
+# ==================== NOVOS VIEWSETS - FASE 2 ====================
+
+from .models import TreatmentPlan, PhysioSession, Discharge
+from .serializers_session import (
+    TreatmentPlanSerializer, TreatmentPlanListSerializer, TreatmentPlanCreateSerializer,
+    PhysioSessionSerializer, PhysioSessionListSerializer, PhysioSessionCreateSerializer,
+    DischargeSerializer, DischargeListSerializer
+)
+from authentication.permissions import (
+    IsGestorOrFisioterapeuta, CanAccessClinicalData, 
+    CanManageSchedule, IsAuthenticatedOrDevMode
+)
+
+
+class TreatmentPlanViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet para gerenciar Planos de Tratamento
+    Endpoints:
+    - GET /api/prontuario/treatment-plans/ - Lista planos
+    - POST /api/prontuario/treatment-plans/ - Cria plano (Fisio/Gestor)
+    - GET /api/prontuario/treatment-plans/{id}/ - Detalhes do plano
+    - PUT/PATCH /api/prontuario/treatment-plans/{id}/ - Atualiza plano
+    - DELETE /api/prontuario/treatment-plans/{id}/ - Remove plano
+    """
+    queryset = TreatmentPlan.objects.all()
+    permission_classes = [AllowAny]  # Temporário para desenvolvimento
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    search_fields = ['title', 'patient__full_name', 'objectives']
+    ordering_fields = ['created_at', 'start_date', 'patient__full_name']
+    ordering = ['-created_at']
+    
+    def get_serializer_class(self):
+        if self.action == 'list':
+            return TreatmentPlanListSerializer
+        elif self.action in ['create', 'update', 'partial_update']:
+            return TreatmentPlanCreateSerializer
+        return TreatmentPlanSerializer
+    
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        user = self.request.user
+        
+        # Para desenvolvimento: simular primeiro gestor se não autenticado
+        if not user.is_authenticated or not hasattr(user, 'clinica'):
+            from authentication.models import User
+            user = User.objects.filter(user_type='GESTOR', is_active_user=True).first()
+        
+        if user and hasattr(user, 'clinica'):
+            queryset = queryset.filter(clinica=user.clinica)
+            
+            # Fisioterapeuta vê apenas seus planos
+            if hasattr(user, 'is_fisioterapeuta') and user.is_fisioterapeuta:
+                queryset = queryset.filter(fisioterapeuta=user)
+        
+        # Filtros opcionais
+        patient_id = self.request.query_params.get('patient', None)
+        if patient_id:
+            queryset = queryset.filter(patient_id=patient_id)
+        
+        status_filter = self.request.query_params.get('status', None)
+        if status_filter:
+            queryset = queryset.filter(status=status_filter)
+        
+        return queryset
+    
+    def perform_create(self, serializer):
+        user = self.request.user if self.request.user.is_authenticated else None
+        
+        if user and hasattr(user, 'clinica'):
+            if user.is_fisioterapeuta:
+                serializer.save(fisioterapeuta=user, clinica=user.clinica)
+            else:
+                serializer.save(clinica=user.clinica)
+        else:
+            serializer.save()
+
+
+class PhysioSessionViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet para gerenciar Sessões de Fisioterapia (Agenda)
+    Endpoints:
+    - GET /api/prontuario/sessions/ - Lista sessões
+    - POST /api/prontuario/sessions/ - Cria sessão (Atendente/Gestor/Fisio)
+    - GET /api/prontuario/sessions/{id}/ - Detalhes da sessão
+    - PUT/PATCH /api/prontuario/sessions/{id}/ - Atualiza sessão
+    - DELETE /api/prontuario/sessions/{id}/ - Remove sessão
+    - GET /api/prontuario/sessions/today/ - Sessões de hoje
+    - GET /api/prontuario/sessions/my_schedule/ - Minha agenda (fisio)
+    - POST /api/prontuario/sessions/{id}/confirm/ - Confirma sessão
+    - POST /api/prontuario/sessions/{id}/complete/ - Finaliza sessão
+    - POST /api/prontuario/sessions/{id}/cancel/ - Cancela sessão
+    """
+    queryset = PhysioSession.objects.all()
+    permission_classes = [AllowAny]  # Temporário para desenvolvimento
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    search_fields = ['patient__full_name', 'fisioterapeuta__first_name']
+    ordering_fields = ['scheduled_date', 'scheduled_time', 'patient__full_name']
+    ordering = ['-scheduled_date', '-scheduled_time']
+    
+    def get_serializer_class(self):
+        if self.action == 'list':
+            return PhysioSessionListSerializer
+        elif self.action in ['create', 'update', 'partial_update']:
+            return PhysioSessionCreateSerializer
+        return PhysioSessionSerializer
+    
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        
+        # Identificar usuário: prioridade para sessão, depois header X-User-Id
+        user = None
+        if self.request.user.is_authenticated:
+            user = self.request.user
+        else:
+            user_id = self.request.headers.get('X-User-Id')
+            if user_id:
+                from authentication.models import User
+                try:
+                    user = User.objects.get(id=int(user_id), is_active_user=True)
+                except (User.DoesNotExist, ValueError):
+                    pass
+        
+        # Fallback para gestor
+        if not user:
+            from authentication.models import User
+            user = User.objects.filter(user_type='GESTOR', is_active_user=True).first()
+        
+        if user and hasattr(user, 'clinica') and user.clinica:
+            queryset = queryset.filter(clinica=user.clinica)
+            
+            # Fisioterapeuta vê apenas sua agenda
+            if user.user_type == 'FISIOTERAPEUTA':
+                queryset = queryset.filter(fisioterapeuta=user)
+        
+        # Filtros opcionais
+        date_filter = self.request.query_params.get('date', None)
+        if date_filter:
+            queryset = queryset.filter(scheduled_date=date_filter)
+        
+        status_filter = self.request.query_params.get('status', None)
+        if status_filter:
+            queryset = queryset.filter(status=status_filter)
+        
+        fisio_filter = self.request.query_params.get('fisioterapeuta', None)
+        if fisio_filter:
+            queryset = queryset.filter(fisioterapeuta_id=fisio_filter)
+        
+        patient_filter = self.request.query_params.get('patient', None)
+        if patient_filter:
+            queryset = queryset.filter(patient_id=patient_filter)
+        
+        return queryset
+    
+    def perform_create(self, serializer):
+        # Identificar usuário: prioridade para sessão, depois header X-User-Id
+        user = None
+        if self.request.user.is_authenticated:
+            user = self.request.user
+        else:
+            user_id = self.request.headers.get('X-User-Id')
+            if user_id:
+                from authentication.models import User
+                try:
+                    user = User.objects.get(id=int(user_id), is_active_user=True)
+                except (User.DoesNotExist, ValueError):
+                    pass
+        
+        # Fallback para desenvolvimento
+        if not user:
+            from authentication.models import User
+            user = User.objects.filter(is_active_user=True).order_by('id').first()
+        
+        # Preencher clinica automaticamente
+        if user and hasattr(user, 'clinica') and user.clinica:
+            serializer.save(clinica=user.clinica, created_by=user)
+        else:
+            # Fallback: usar primeira clínica
+            from authentication.models import Clinica
+            clinica = Clinica.objects.first()
+            serializer.save(clinica=clinica, created_by=user)
+    
+    @action(detail=False, methods=['get'])
+    def today(self, request):
+        """Retorna sessões de hoje"""
+        from datetime import date
+        queryset = self.get_queryset().filter(scheduled_date=date.today())
+        serializer = PhysioSessionListSerializer(queryset, many=True)
+        return Response(serializer.data)
+    
+    @action(detail=False, methods=['get'])
+    def my_schedule(self, request):
+        """Retorna agenda do fisioterapeuta logado"""
+        user = request.user if request.user.is_authenticated else None
+        
+        if not user or not hasattr(user, 'is_fisioterapeuta'):
+            from authentication.models import User
+            user = User.objects.filter(user_type='FISIOTERAPEUTA', is_active_user=True).first()
+        
+        if user:
+            queryset = PhysioSession.objects.filter(
+                fisioterapeuta=user,
+                scheduled_date__gte=timezone.now().date()
+            ).order_by('scheduled_date', 'scheduled_time')[:20]
+            
+            serializer = PhysioSessionListSerializer(queryset, many=True)
+            return Response(serializer.data)
+        
+        return Response([])
+    
+    @action(detail=True, methods=['post'])
+    def confirm(self, request, pk=None):
+        """Confirma uma sessão agendada"""
+        session = self.get_object()
+        if session.status not in ['AGENDADA']:
+            return Response(
+                {'error': 'Sessão não pode ser confirmada neste status'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        session.status = 'CONFIRMADA'
+        session.save()
+        return Response({'status': 'Sessão confirmada'})
+    
+    @action(detail=True, methods=['post'])
+    def complete(self, request, pk=None):
+        """Marca sessão como realizada"""
+        session = self.get_object()
+        if session.status not in ['AGENDADA', 'CONFIRMADA', 'EM_ANDAMENTO']:
+            return Response(
+                {'error': 'Sessão não pode ser finalizada neste status'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Atualizar com dados do request se fornecidos
+        session.status = 'REALIZADA'
+        session.procedures = request.data.get('procedures', session.procedures)
+        session.evolution = request.data.get('evolution', session.evolution)
+        session.pain_scale_before = request.data.get('pain_scale_before', session.pain_scale_before)
+        session.pain_scale_after = request.data.get('pain_scale_after', session.pain_scale_after)
+        session.observations = request.data.get('observations', session.observations)
+        session.save()
+        
+        # Atualizar last_visit do paciente
+        session.patient.last_visit = timezone.now()
+        session.patient.save()
+        
+        return Response({'status': 'Sessão finalizada'})
+    
+    @action(detail=True, methods=['post'])
+    def cancel(self, request, pk=None):
+        """Cancela uma sessão"""
+        session = self.get_object()
+        if session.status in ['REALIZADA', 'CANCELADA']:
+            return Response(
+                {'error': 'Sessão não pode ser cancelada'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        session.status = 'CANCELADA'
+        session.observations = request.data.get('reason', '') + '\n' + session.observations
+        session.save()
+        return Response({'status': 'Sessão cancelada'})
+    
+    @action(detail=True, methods=['post'])
+    def no_show(self, request, pk=None):
+        """Marca sessão como falta do paciente"""
+        session = self.get_object()
+        if session.status in ['REALIZADA', 'CANCELADA', 'FALTA']:
+            return Response(
+                {'error': 'Status inválido para marcar falta'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        session.status = 'FALTA'
+        session.observations = f"Falta registrada\n{session.observations}"
+        session.save()
+        return Response({'status': 'Falta registrada'})
+
+
+class DischargeViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet para gerenciar Altas/Encerramentos
+    Endpoints:
+    - GET /api/prontuario/discharges/ - Lista altas
+    - POST /api/prontuario/discharges/ - Registra alta (apenas Fisio/Gestor)
+    - GET /api/prontuario/discharges/{id}/ - Detalhes da alta
+    """
+    queryset = Discharge.objects.all()
+    permission_classes = [AllowAny]  # Temporário para desenvolvimento
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    search_fields = ['patient__full_name', 'reason']
+    ordering_fields = ['discharge_date', 'patient__full_name']
+    ordering = ['-discharge_date']
+    
+    def get_serializer_class(self):
+        if self.action == 'list':
+            return DischargeListSerializer
+        return DischargeSerializer
+    
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        user = self.request.user
+        
+        if not user.is_authenticated or not hasattr(user, 'clinica'):
+            from authentication.models import User
+            user = User.objects.filter(user_type='GESTOR', is_active_user=True).first()
+        
+        if user and hasattr(user, 'clinica'):
+            queryset = queryset.filter(clinica=user.clinica)
+            
+            if hasattr(user, 'is_fisioterapeuta') and user.is_fisioterapeuta:
+                queryset = queryset.filter(fisioterapeuta=user)
+        
+        return queryset
+    
+    def perform_create(self, serializer):
+        user = self.request.user if self.request.user.is_authenticated else None
+        
+        if user and hasattr(user, 'clinica'):
+            if user.is_fisioterapeuta:
+                serializer.save(fisioterapeuta=user, clinica=user.clinica)
+            else:
+                serializer.save(clinica=user.clinica)
+        else:
+            serializer.save()

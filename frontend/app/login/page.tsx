@@ -4,10 +4,10 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
-import { 
-  LogIn, 
-  User, 
-  Lock, 
+import {
+  LogIn,
+  User,
+  Lock,
   AlertCircle,
   Loader2,
   Sparkles,
@@ -31,14 +31,14 @@ export default function LoginPage() {
 
     try {
       const response = await api.post('/api/auth/login/', formData);
-      
-      // Salvar dados do usuário no localStorage
-      // A autenticação é feita via cookie de sessão Django (withCredentials: true)
+
+      // Limpar dados anteriores e salvar novo usuário
+      localStorage.clear();
       localStorage.setItem('user', JSON.stringify(response.data.user));
-      
+
       // Pequeno delay para garantir que o localStorage seja salvo
       await new Promise(resolve => setTimeout(resolve, 100));
-      
+
       // Redirecionar para o dashboard
       window.location.href = '/dashboard';
     } catch (err: any) {
@@ -159,8 +159,8 @@ export default function LoginPage() {
             <div className="text-center pt-4 border-t border-gray-100">
               <p className="text-sm text-[#7F8C8D]">
                 Esqueceu sua senha?{' '}
-                <a 
-                  href="mailto:contato@corehive.com.br" 
+                <a
+                  href="mailto:contato@corehive.com.br"
                   className="text-[#009688] font-semibold hover:text-[#4DB6AC] transition-colors"
                 >
                   Entre em contato

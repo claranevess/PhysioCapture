@@ -3,41 +3,41 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { apiRoutes } from "@/lib/api";
-import { 
-  ArgonStatsCard, 
+import {
+  ArgonStatsCard,
   ArgonInfoCard,
   ArgonActionCard,
-  ArgonAvatarCard 
+  ArgonAvatarCard
 } from "@/components/Argon/ArgonCard";
 import { argonTheme } from "@/lib/argon-theme";
-import { 
-  Users, 
-  FileText, 
-  Calendar, 
-  UserPlus, 
-  Camera, 
-  Search, 
-  Activity, 
+import {
+  Users,
+  FileText,
+  Calendar,
+  UserPlus,
+  Camera,
+  Search,
+  Activity,
   ChevronRight,
   BarChart3,
   PieChart,
   Sparkles,
   FolderOpen
 } from 'lucide-react';
-import { 
-  AreaChart, 
-  Area, 
-  BarChart, 
-  Bar, 
-  PieChart as RechartsPie, 
-  Pie, 
-  Cell, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
-  Legend, 
-  ResponsiveContainer 
+import {
+  AreaChart,
+  Area,
+  BarChart,
+  Bar,
+  PieChart as RechartsPie,
+  Pie,
+  Cell,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer
 } from 'recharts';
 
 interface FisioDashboardProps {
@@ -77,7 +77,7 @@ export default function FisioDashboard({ currentUser }: FisioDashboardProps) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <div className="text-center">
-          <div 
+          <div
             className="w-16 h-16 mx-auto rounded-full flex items-center justify-center mb-4 animate-pulse"
             style={{ background: argonTheme.gradients.primary }}
           >
@@ -104,7 +104,7 @@ export default function FisioDashboard({ currentUser }: FisioDashboardProps) {
       </div>
 
       {/* Stats Cards Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
         <ArgonStatsCard
           title="Meus Pacientes"
           value={stats.totalPatients}
@@ -118,22 +118,10 @@ export default function FisioDashboard({ currentUser }: FisioDashboardProps) {
         />
 
         <ArgonStatsCard
-          title="Prontuários Ativos"
-          value={stats.activeRecords}
-          icon={<FileText className="w-7 h-7" />}
-          iconGradient="success"
-          trend={{
-            value: stats.activeRecords,
-            label: "últimos 30 dias",
-            isPositive: true,
-          }}
-        />
-
-        <ArgonStatsCard
           title="Docs Digitalizados Hoje"
           value={stats.documentsToday}
           icon={<Camera className="w-7 h-7" />}
-          iconGradient="error"
+          iconGradient="success"
           trend={{
             value: stats.documentsToday,
             label: "com OCR automático",
@@ -168,86 +156,93 @@ export default function FisioDashboard({ currentUser }: FisioDashboardProps) {
               <AreaChart data={stats.monthlyTrend}>
                 <defs>
                   <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#009688" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="#009688" stopOpacity={0}/>
+                    <stop offset="5%" stopColor="#009688" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="#009688" stopOpacity={0} />
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                <XAxis 
-                  dataKey="month" 
+                <XAxis
+                  dataKey="month"
                   stroke={argonTheme.colors.text.secondary}
-                  style={{ fontSize: '12px' }} 
+                  style={{ fontSize: '12px' }}
                 />
-                <YAxis 
+                <YAxis
                   stroke={argonTheme.colors.text.secondary}
-                  style={{ fontSize: '12px' }} 
+                  style={{ fontSize: '12px' }}
                 />
-                <Tooltip 
-                  contentStyle={{ 
-                    backgroundColor: 'white', 
-                    border: '1px solid #e0e0e0', 
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: 'white',
+                    border: '1px solid #e0e0e0',
                     borderRadius: '12px',
                     boxShadow: argonTheme.shadows.lg,
-                  }} 
+                  }}
                 />
-                <Area 
-                  type="monotone" 
-                  dataKey="value" 
+                <Area
+                  type="monotone"
+                  dataKey="value"
                   stroke={argonTheme.colors.primary.main}
                   strokeWidth={3}
-                  fillOpacity={1} 
-                  fill="url(#colorValue)" 
+                  fillOpacity={1}
+                  fill="url(#colorValue)"
                 />
               </AreaChart>
             </ResponsiveContainer>
           </ArgonInfoCard>
         </div>
 
-        {/* Pie Chart - Distribuição */}
+        {/* Próximas Consultas */}
         <ArgonInfoCard
-          title="Meus Serviços"
-          subtitle="Distribuição"
-          icon={<PieChart className="w-5 h-5" />}
+          title="Próximas Consultas"
+          subtitle="Agenda de hoje"
+          icon={<Calendar className="w-5 h-5" />}
           iconGradient="secondary"
         >
-          <ResponsiveContainer width="100%" height={240}>
-            <RechartsPie>
-              <Pie
-                data={stats.serviceDistribution}
-                cx="50%"
-                cy="50%"
-                innerRadius={60}
-                outerRadius={80}
-                paddingAngle={5}
-                dataKey="value"
-              >
-                {stats.serviceDistribution.map((entry: any, index: number) => (
-                  <Cell key={`cell-${index}`} fill={entry.color} />
-                ))}
-              </Pie>
-              <Tooltip />
-            </RechartsPie>
-          </ResponsiveContainer>
-          <div className="mt-4 space-y-2">
-            {stats.serviceDistribution.map((item: any, index: number) => (
-              <div key={index} className="flex items-center justify-between text-sm">
-                <div className="flex items-center gap-2">
-                  <div 
-                    className="w-3 h-3 rounded-full" 
-                    style={{ backgroundColor: item.color }}
-                  />
-                  <span style={{ color: argonTheme.colors.text.primary }}>
-                    {item.name}
-                  </span>
-                </div>
-                <span 
-                  className="font-semibold"
-                  style={{ color: argonTheme.colors.text.primary }}
+          <div className="space-y-3">
+            {stats.upcomingSessions && stats.upcomingSessions.length > 0 ? (
+              stats.upcomingSessions.slice(0, 4).map((session: any, index: number) => (
+                <div
+                  key={index}
+                  className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
                 >
-                  {item.value}%
-                </span>
+                  <div className="flex items-center gap-3">
+                    <div
+                      className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold"
+                      style={{ background: session.status === 'CONFIRMADA' ? argonTheme.gradients.success : argonTheme.gradients.primary }}
+                    >
+                      {session.patient_name?.charAt(0) || 'P'}
+                    </div>
+                    <div>
+                      <p className="font-medium" style={{ color: argonTheme.colors.text.primary }}>
+                        {session.patient_name || 'Paciente'}
+                      </p>
+                      <p className="text-xs" style={{ color: argonTheme.colors.text.secondary }}>
+                        {session.status_display || 'Agendada'}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-lg font-bold" style={{ color: argonTheme.colors.primary.main }}>
+                      {session.scheduled_time?.slice(0, 5) || '--:--'}
+                    </p>
+                    <p className="text-xs" style={{ color: argonTheme.colors.text.secondary }}>
+                      {session.duration_minutes || 50}min
+                    </p>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="text-center py-6 text-gray-400">
+                <Calendar className="w-12 h-12 mx-auto mb-2 opacity-30" />
+                <p>Nenhuma consulta hoje</p>
+                <a
+                  href="/agenda"
+                  className="text-sm text-teal-600 hover:underline mt-2 inline-block"
+                >
+                  Ver agenda completa
+                </a>
               </div>
-            ))}
+            )}
           </div>
         </ArgonInfoCard>
       </div>
@@ -262,22 +257,22 @@ export default function FisioDashboard({ currentUser }: FisioDashboardProps) {
         <ResponsiveContainer width="100%" height={280}>
           <BarChart data={stats.weeklyData}>
             <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-            <XAxis 
-              dataKey="day" 
+            <XAxis
+              dataKey="day"
               stroke={argonTheme.colors.text.secondary}
-              style={{ fontSize: '12px' }} 
+              style={{ fontSize: '12px' }}
             />
-            <YAxis 
+            <YAxis
               stroke={argonTheme.colors.text.secondary}
-              style={{ fontSize: '12px' }} 
+              style={{ fontSize: '12px' }}
             />
-            <Tooltip 
-              contentStyle={{ 
-                backgroundColor: 'white', 
-                border: '1px solid #e0e0e0', 
+            <Tooltip
+              contentStyle={{
+                backgroundColor: 'white',
+                border: '1px solid #e0e0e0',
                 borderRadius: '12px',
                 boxShadow: argonTheme.shadows.lg,
-              }} 
+              }}
             />
             <Legend />
             <Bar dataKey="pacientes" fill="#009688" radius={[8, 8, 0, 0]} />
@@ -289,7 +284,7 @@ export default function FisioDashboard({ currentUser }: FisioDashboardProps) {
 
       {/* Quick Actions */}
       <div>
-        <h2 
+        <h2
           className="text-xl font-bold mb-4"
           style={{ color: argonTheme.colors.text.primary }}
         >

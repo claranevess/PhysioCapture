@@ -1,11 +1,11 @@
 'use client';
 
 import Link from 'next/link';
-import { 
-  Sparkles, 
-  FileText, 
-  Users, 
-  Camera, 
+import {
+  Sparkles,
+  FileText,
+  Users,
+  Camera,
   BarChart3,
   Shield,
   Zap,
@@ -148,60 +148,80 @@ export default function WelcomePage() {
             </div>
           </div>
 
-          {/* User Types - Multi-Tenant */}
+          {/* User Types - Papéis do Sistema */}
           <div className="mt-20">
             <h2 className="text-3xl font-bold text-[#2C3E50] text-center mb-4">
-              Modelo Multi-Tenant
+              Papéis do Sistema
             </h2>
             <p className="text-center text-[#7F8C8D] mb-12 max-w-2xl mx-auto">
-              Cada clínica tem sua própria área isolada, com gestores e fisioterapeutas dedicados
+              Controle de acesso inteligente para cada tipo de profissional da clínica
             </p>
-            <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+            <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
               <div className="bg-gradient-to-br from-[#009688] to-[#4DB6AC] rounded-2xl p-8 text-white shadow-2xl">
                 <div className="flex items-center gap-3 mb-4">
                   <Shield className="w-8 h-8" />
-                  <h3 className="font-bold text-2xl">Gestor da Clínica</h3>
+                  <h3 className="font-bold text-xl">Gestor</h3>
                 </div>
-                <ul className="space-y-3">
+                <ul className="space-y-3 text-sm">
                   <li className="flex items-start gap-2">
                     <CheckCircle2 className="w-5 h-5 flex-shrink-0 mt-0.5" />
-                    <span className="text-white/90">Gerencia a clínica contratante</span>
+                    <span className="text-white/90">Gerencia toda a clínica</span>
                   </li>
                   <li className="flex items-start gap-2">
                     <CheckCircle2 className="w-5 h-5 flex-shrink-0 mt-0.5" />
-                    <span className="text-white/90">Cadastra e gerencia fisioterapeutas</span>
+                    <span className="text-white/90">Cadastra profissionais</span>
                   </li>
                   <li className="flex items-start gap-2">
                     <CheckCircle2 className="w-5 h-5 flex-shrink-0 mt-0.5" />
-                    <span className="text-white/90">Acessa dados administrativos da clínica</span>
+                    <span className="text-white/90">Relatórios e estoque</span>
                   </li>
                 </ul>
               </div>
               <div className="bg-gradient-to-br from-[#66BB6A] to-[#81C784] rounded-2xl p-8 text-white shadow-2xl">
                 <div className="flex items-center gap-3 mb-4">
                   <Heart className="w-8 h-8" />
-                  <h3 className="font-bold text-2xl">Fisioterapeuta</h3>
+                  <h3 className="font-bold text-xl">Fisioterapeuta</h3>
                 </div>
-                <ul className="space-y-3">
+                <ul className="space-y-3 text-sm">
                   <li className="flex items-start gap-2">
                     <CheckCircle2 className="w-5 h-5 flex-shrink-0 mt-0.5" />
-                    <span className="text-white/90">Cria e gerencia registros de pacientes</span>
+                    <span className="text-white/90">Atende seus pacientes</span>
                   </li>
                   <li className="flex items-start gap-2">
                     <CheckCircle2 className="w-5 h-5 flex-shrink-0 mt-0.5" />
-                    <span className="text-white/90">Atende pacientes e mantém prontuários</span>
+                    <span className="text-white/90">Prontuários e evoluções</span>
                   </li>
                   <li className="flex items-start gap-2">
                     <CheckCircle2 className="w-5 h-5 flex-shrink-0 mt-0.5" />
-                    <span className="text-white/90">Acesso apenas aos próprios pacientes</span>
+                    <span className="text-white/90">Agenda pessoal</span>
+                  </li>
+                </ul>
+              </div>
+              <div className="bg-gradient-to-br from-[#BA68C8] to-[#CE93D8] rounded-2xl p-8 text-white shadow-2xl">
+                <div className="flex items-center gap-3 mb-4">
+                  <Users className="w-8 h-8" />
+                  <h3 className="font-bold text-xl">Recepção</h3>
+                </div>
+                <ul className="space-y-3 text-sm">
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="w-5 h-5 flex-shrink-0 mt-0.5" />
+                    <span className="text-white/90">Gerencia a agenda</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="w-5 h-5 flex-shrink-0 mt-0.5" />
+                    <span className="text-white/90">Cadastro de pacientes</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="w-5 h-5 flex-shrink-0 mt-0.5" />
+                    <span className="text-white/90">Confirmação de sessões</span>
                   </li>
                 </ul>
               </div>
             </div>
-            <div className="mt-8 p-6 bg-blue-50 border border-blue-200 rounded-xl max-w-4xl mx-auto">
+            <div className="mt-8 p-6 bg-blue-50 border border-blue-200 rounded-xl max-w-5xl mx-auto">
               <p className="text-[#2C3E50] text-center">
-                <strong className="text-[#009688]">📝 Nota:</strong> Pacientes são <strong>registros de dados</strong>, não usuários. 
-                Eles não fazem login no sistema e são gerenciados pelos fisioterapeutas.
+                <strong className="text-[#009688]">📝 Nota:</strong> Pacientes são <strong>registros de dados</strong>, não usuários.
+                Eles não fazem login no sistema e são gerenciados pelos profissionais.
               </p>
             </div>
           </div>

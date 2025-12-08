@@ -23,6 +23,8 @@ import {
   Sparkles,
   User,
   Stethoscope,
+  Calendar,
+  Package,
 } from 'lucide-react';
 
 interface NavItem {
@@ -31,28 +33,35 @@ interface NavItem {
   icon: any;
   badge?: string;
   children?: NavItem[];
-  onlyFor?: 'GESTOR' | 'FISIOTERAPEUTA'; // Item visível apenas para este tipo de usuário
+  onlyFor?: 'GESTOR' | 'FISIOTERAPEUTA' | 'ATENDENTE';
 }
 
 const navItems: NavItem[] = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-  { 
-    name: 'Pacientes', 
-    href: '/patients', 
+  { name: 'Agenda', href: '/agenda', icon: Calendar },
+  {
+    name: 'Pacientes',
+    href: '/patients',
     icon: Users,
     children: [
       { name: 'Lista de Pacientes', href: '/patients', icon: Users },
       { name: 'Novo Paciente', href: '/patients/new', icon: User },
     ]
   },
-  { 
-    name: 'Fisioterapeutas', 
-    href: '/fisioterapeutas', 
+  {
+    name: 'Fisioterapeutas',
+    href: '/fisioterapeutas',
     icon: Stethoscope,
-    onlyFor: 'GESTOR' // Apenas gestores veem este item
+    onlyFor: 'GESTOR'
   },
   { name: 'Documentos', href: '/documents', icon: FolderOpen },
   { name: 'Digitalizar', href: '/documents/digitize', icon: Camera },
+  {
+    name: 'Estoque',
+    href: '/estoque',
+    icon: Package,
+    onlyFor: 'GESTOR'
+  },
 ];
 
 const bottomItems: NavItem[] = [
@@ -114,16 +123,15 @@ export default function ArgonSidenav() {
 
       {/* Sidenav */}
       <aside
-        className={`fixed top-0 left-0 z-40 h-screen transition-transform duration-300 ${
-          isOpen ? 'translate-x-0' : '-translate-x-full'
-        } lg:translate-x-0`}
+        className={`fixed top-0 left-0 z-40 h-screen transition-transform duration-300 ${isOpen ? 'translate-x-0' : '-translate-x-full'
+          } lg:translate-x-0`}
         style={{ width: '280px' }}
       >
         <div className="h-full flex flex-col bg-white shadow-2xl">
           {/* Logo e Brand */}
           <div className="p-6 border-b border-gray-100">
             <Link href="/dashboard" className="flex items-center gap-3 group">
-              <div 
+              <div
                 className="w-12 h-12 rounded-xl flex items-center justify-center shadow-lg transition-transform group-hover:scale-110"
                 style={{ background: argonTheme.gradients.primary }}
               >
@@ -146,71 +154,70 @@ export default function ArgonSidenav() {
               {navItems
                 .filter(item => !item.onlyFor || item.onlyFor === currentUser?.user_type)
                 .map((item) => (
-                <div key={item.name}>
-                  {item.children ? (
-                    <>
-                      <button
-                        onClick={() => toggleItem(item.name)}
-                        className="w-full flex items-center justify-between px-4 py-3 rounded-lg transition-all"
+                  <div key={item.name}>
+                    {item.children ? (
+                      <>
+                        <button
+                          onClick={() => toggleItem(item.name)}
+                          className="w-full flex items-center justify-between px-4 py-3 rounded-lg transition-all"
+                          style={{
+                            backgroundColor: isActive(item.href) ? argonTheme.colors.light.main : 'transparent',
+                            color: isActive(item.href) ? argonTheme.colors.primary.main : argonTheme.colors.text.secondary,
+                          }}
+                        >
+                          <div className="flex items-center gap-3">
+                            <item.icon className="w-5 h-5" />
+                            <span className="font-medium text-sm">{item.name}</span>
+                          </div>
+                          <ChevronDown
+                            className={`w-4 h-4 transition-transform ${expandedItems.includes(item.name) ? 'rotate-180' : ''
+                              }`}
+                          />
+                        </button>
+                        {expandedItems.includes(item.name) && (
+                          <div className="ml-4 mt-1 space-y-1">
+                            {item.children.map((child) => (
+                              <Link
+                                key={child.name}
+                                href={child.href}
+                                onClick={() => setIsOpen(false)}
+                                className="flex items-center gap-3 px-4 py-2 rounded-lg transition-all text-sm"
+                                style={{
+                                  backgroundColor: isActive(child.href) ? argonTheme.colors.light.main : 'transparent',
+                                  color: isActive(child.href) ? argonTheme.colors.primary.main : argonTheme.colors.text.secondary,
+                                }}
+                              >
+                                <child.icon className="w-4 h-4" />
+                                <span className="font-medium">{child.name}</span>
+                              </Link>
+                            ))}
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <Link
+                        href={item.href}
+                        onClick={() => setIsOpen(false)}
+                        className="flex items-center gap-3 px-4 py-3 rounded-lg transition-all group"
                         style={{
                           backgroundColor: isActive(item.href) ? argonTheme.colors.light.main : 'transparent',
                           color: isActive(item.href) ? argonTheme.colors.primary.main : argonTheme.colors.text.secondary,
                         }}
                       >
-                        <div className="flex items-center gap-3">
-                          <item.icon className="w-5 h-5" />
-                          <span className="font-medium text-sm">{item.name}</span>
-                        </div>
-                        <ChevronDown
-                          className={`w-4 h-4 transition-transform ${
-                            expandedItems.includes(item.name) ? 'rotate-180' : ''
-                          }`}
-                        />
-                      </button>
-                      {expandedItems.includes(item.name) && (
-                        <div className="ml-4 mt-1 space-y-1">
-                          {item.children.map((child) => (
-                            <Link
-                              key={child.name}
-                              href={child.href}
-                              onClick={() => setIsOpen(false)}
-                              className="flex items-center gap-3 px-4 py-2 rounded-lg transition-all text-sm"
-                              style={{
-                                backgroundColor: isActive(child.href) ? argonTheme.colors.light.main : 'transparent',
-                                color: isActive(child.href) ? argonTheme.colors.primary.main : argonTheme.colors.text.secondary,
-                              }}
-                            >
-                              <child.icon className="w-4 h-4" />
-                              <span className="font-medium">{child.name}</span>
-                            </Link>
-                          ))}
-                        </div>
-                      )}
-                    </>
-                  ) : (
-                    <Link
-                      href={item.href}
-                      onClick={() => setIsOpen(false)}
-                      className="flex items-center gap-3 px-4 py-3 rounded-lg transition-all group"
-                      style={{
-                        backgroundColor: isActive(item.href) ? argonTheme.colors.light.main : 'transparent',
-                        color: isActive(item.href) ? argonTheme.colors.primary.main : argonTheme.colors.text.secondary,
-                      }}
-                    >
-                      <item.icon className="w-5 h-5" />
-                      <span className="font-medium text-sm">{item.name}</span>
-                      {item.badge && (
-                        <span 
-                          className="ml-auto px-2 py-0.5 text-xs font-bold rounded-full text-white"
-                          style={{ background: argonTheme.gradients.error }}
-                        >
-                          {item.badge}
-                        </span>
-                      )}
-                    </Link>
-                  )}
-                </div>
-              ))}
+                        <item.icon className="w-5 h-5" />
+                        <span className="font-medium text-sm">{item.name}</span>
+                        {item.badge && (
+                          <span
+                            className="ml-auto px-2 py-0.5 text-xs font-bold rounded-full text-white"
+                            style={{ background: argonTheme.gradients.error }}
+                          >
+                            {item.badge}
+                          </span>
+                        )}
+                      </Link>
+                    )}
+                  </div>
+                ))}
             </div>
 
             {/* Divider */}
