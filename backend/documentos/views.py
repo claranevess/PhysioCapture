@@ -75,21 +75,29 @@ class DocumentViewSet(viewsets.ModelViewSet):
     
     def get_queryset(self):
         queryset = super().get_queryset()
-        user = self.request.user
         
-        # 🚧 DESENVOLVIMENTO: RBAC desabilitado temporariamente
-        # TODO: Reabilitar filtros de segurança em produção
+        # Identificar usuário: prioridade para sessão, depois header X-User-Id
+        user = None
+        if self.request.user.is_authenticated:
+            user = self.request.user
+        else:
+            user_id = self.request.headers.get('X-User-Id')
+            if user_id:
+                from authentication.models import User
+                try:
+                    user = User.objects.get(id=int(user_id), is_active_user=True)
+                except (User.DoesNotExist, ValueError):
+                    pass
         
         # RBAC: Filtrar por clínica e papel do usuário
-        if user.is_authenticated and hasattr(user, 'clinica'):
+        if user and hasattr(user, 'clinica') and user.clinica:
             # Filtrar pela clínica do usuário através do relacionamento patient
             queryset = queryset.filter(patient__clinica=user.clinica)
             
             # Se for fisioterapeuta, mostrar apenas documentos dos seus pacientes
-            if user.is_fisioterapeuta:
+            if user.user_type == 'FISIOTERAPEUTA':
                 queryset = queryset.filter(patient__fisioterapeuta=user)
             # Se for gestor, mostra todos os documentos da clínica (já filtrado acima)
-        # else: Em desenvolvimento, mostrar todos os documentos
         
         # Filtrar por paciente
         patient_id = self.request.query_params.get('patient', None)

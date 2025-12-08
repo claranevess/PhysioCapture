@@ -758,28 +758,37 @@ def dashboard_statistics_fisioterapeuta(request):
     
     # Dados semanais (últimos 7 dias) - apenas do fisioterapeuta
     weekly_data = []
-    days_pt = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
+    days_pt = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom']
     
-    for i in range(6, -1, -1):
-        day = today - timedelta(days=i)
-        day_name = days_pt[day.weekday()]
+    # Calcular início da semana (segunda-feira)
+    week_start = today - timedelta(days=today.weekday())
+    
+    for i in range(7):
+        day = week_start + timedelta(days=i)
+        day_name = days_pt[i]
         
+        # Pacientes criados neste dia
         patients_count = my_patients.filter(created_at__date=day).count()
-        records_count = MedicalRecord.objects.filter(
-            patient__fisioterapeuta=user,
-            record_date__date=day
-        ).count()
-        consultations = MedicalRecord.objects.filter(
-            patient__fisioterapeuta=user,
-            record_date__date=day,
-            record_type='CONSULTA'
-        ).count()
+        
+        # Documentos reais criados neste dia (apenas dos meus pacientes)
+        docs_count = my_documents.filter(created_at__date=day).count()
+        
+        # Sessões/consultas realizadas neste dia
+        sessions_count = 0
+        try:
+            sessions_count = PhysioSession.objects.filter(
+                fisioterapeuta=user,
+                scheduled_date=day,
+                status='REALIZADA'
+            ).count()
+        except:
+            pass
         
         weekly_data.append({
             'day': day_name,
             'pacientes': patients_count,
-            'consultas': consultations,
-            'documentos': records_count
+            'consultas': sessions_count,
+            'documentos': docs_count
         })
     
     # Tendência mensal (últimos 8 meses) - apenas do fisioterapeuta

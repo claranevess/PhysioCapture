@@ -40,31 +40,8 @@ export default function ArgonLayout({ children }: ArgonLayoutProps) {
         </main>
 
         {/* Footer */}
-        <footer 
-          className="px-4 sm:px-6 lg:px-8 py-6 border-t border-gray-100 bg-white"
-        >
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-            <p 
-              className="text-sm"
-              style={{ color: argonTheme.colors.text.secondary }}
-            >
-              © 2025 PhysioCapture • Sistema de Gestão Fisioterapêutica
-            </p>
-            <div className="flex items-center gap-2">
-              <span 
-                className="text-sm"
-                style={{ color: argonTheme.colors.text.secondary }}
-              >
-                Desenvolvido por
-              </span>
-              <span 
-                className="text-sm font-semibold"
-                style={{ color: argonTheme.colors.primary.main }}
-              >
-                Core Hive
-              </span>
-            </div>
-          </div>
+        <footer className="px-4 sm:px-6 lg:px-8 py-4">
+          {/* Espaço em branco */}
         </footer>
       </div>
     </div>
