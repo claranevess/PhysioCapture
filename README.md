@@ -35,25 +35,6 @@ http://localhost:3000
 ```
 ### 5. Na página inicial, você pode se cadastrar e acessar a plataforma conforme seu perfil de usuário.
 
-## Configuração do Assistente de IA (Opcional)
-
-O Physio Capture conta com um assistente de IA local para ajudar usuários com dúvidas sobre o sistema. Para habilitá-lo:
-
-### 1. Instale a dependência llama-cpp-python:
-```bash
-cd backend
-pip install llama-cpp-python
-```
-
-### 2. Baixe o modelo de IA:
-- Acesse: [DeepSeek-R1-Distill-Qwen-1.5B-GGUF](https://huggingface.co/bartowski/DeepSeek-R1-Distill-Qwen-1.5B-GGUF)
-- Baixe o arquivo `DeepSeek-R1-Distill-Qwen-1.5B-Q8_0.gguf` (~1.7GB)
-- Coloque o arquivo em: `backend/models_llm/`
-
-### 3. Reinicie o servidor Django
-
-O assistente estará disponível em `POST /api/assistant/` após configurado.
-
 ## Tecnologias Utilizadas
 
 <div align="center">

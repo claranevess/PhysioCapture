@@ -26,7 +26,10 @@ import {
   ClipboardList,
   Stethoscope,
   Heart,
-  Edit3
+  Edit3,
+  X,
+  Plus,
+  Save
 } from 'lucide-react';
 
 type TabType = 'resumo' | 'sessoes' | 'documentos' | 'evolucao';
@@ -52,6 +55,19 @@ export default function PatientRecordsPage() {
   const [sessions, setSessions] = useState<PhysioSession[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+
+  // Modal state
+  const [showEvolutionModal, setShowEvolutionModal] = useState(false);
+  const [savingEvolution, setSavingEvolution] = useState(false);
+  const [evolutionForm, setEvolutionForm] = useState({
+    record_type: 'EVOLUCAO',
+    title: '',
+    chief_complaint: '',
+    physical_exam: '',
+    diagnosis: '',
+    treatment_plan: '',
+    observations: ''
+  });
 
   useEffect(() => {
     loadPatientData();
@@ -118,6 +134,63 @@ export default function PatientRecordsPage() {
         return <XCircle className="w-4 h-4" />;
       default:
         return <Clock className="w-4 h-4" />;
+    }
+  };
+
+  // Modal functions
+  const openEvolutionModal = () => {
+    setEvolutionForm({
+      record_type: 'EVOLUCAO',
+      title: `Evolução - ${new Date().toLocaleDateString('pt-BR')}`,
+      chief_complaint: '',
+      physical_exam: '',
+      diagnosis: '',
+      treatment_plan: '',
+      observations: ''
+    });
+    setShowEvolutionModal(true);
+  };
+
+  const closeEvolutionModal = () => {
+    setShowEvolutionModal(false);
+    setEvolutionForm({
+      record_type: 'EVOLUCAO',
+      title: '',
+      chief_complaint: '',
+      physical_exam: '',
+      diagnosis: '',
+      treatment_plan: '',
+      observations: ''
+    });
+  };
+
+  const handleEvolutionSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!evolutionForm.title.trim()) {
+      alert('O título é obrigatório');
+      return;
+    }
+
+    setSavingEvolution(true);
+    try {
+      const response = await api.post('/api/prontuario/medical-records/', {
+        patient: patientId,
+        ...evolutionForm,
+        record_date: new Date().toISOString()
+      });
+
+      // Add new record to the list
+      setMedicalRecords(prev => [response.data, ...prev]);
+      closeEvolutionModal();
+
+      // Switch to evolution tab to show the new record
+      setActiveTab('evolucao');
+    } catch (err: any) {
+      console.error('Error saving evolution:', err);
+      alert('Erro ao salvar evolução. Tente novamente.');
+    } finally {
+      setSavingEvolution(false);
     }
   };
 
@@ -534,7 +607,7 @@ export default function PatientRecordsPage() {
               <h2 className="text-lg font-semibold" style={{ color: argonTheme.colors.text.primary }}>
                 Evolução Clínica ({medicalRecords.length})
               </h2>
-              <ArgonButton variant="gradient" color="primary" size="sm" icon={<Activity className="w-4 h-4" />}>
+              <ArgonButton variant="gradient" color="primary" size="sm" icon={<Plus className="w-4 h-4" />} onClick={openEvolutionModal}>
                 Nova Evolução
               </ArgonButton>
             </div>
@@ -553,14 +626,14 @@ export default function PatientRecordsPage() {
                 <p className="text-sm mb-4" style={{ color: argonTheme.colors.text.secondary }}>
                   Registre as consultas e evoluções do tratamento
                 </p>
-                <ArgonButton variant="gradient" color="primary">
+                <ArgonButton variant="gradient" color="primary" onClick={openEvolutionModal}>
                   Adicionar Evolução
                 </ArgonButton>
               </ArgonCard>
             ) : (
               <div className="space-y-4">
-                {medicalRecords.map((record, index) => (
-                  <ArgonCard key={record.id} className="p-6">
+                {medicalRecords.map((record) => (
+                  <ArgonCard key={record.id} className="p-5 hover:shadow-lg transition-shadow cursor-pointer">
                     <div className="flex items-start gap-4">
                       <div
                         className="w-3 h-3 rounded-full mt-2 flex-shrink-0"
@@ -572,52 +645,77 @@ export default function PatientRecordsPage() {
                             <p className="text-sm" style={{ color: argonTheme.colors.text.secondary }}>
                               {formatDateTime(record.record_date)}
                             </p>
-                            <h3 className="font-semibold mt-1" style={{ color: argonTheme.colors.text.primary }}>
-                              {record.record_type_display || record.record_type || 'Consulta'}
+                            <h3 className="font-bold text-lg mt-1" style={{ color: argonTheme.colors.text.primary }}>
+                              {record.title || record.record_type_display || record.record_type || 'Evolução'}
                             </h3>
+                            <span
+                              className="inline-block px-2 py-0.5 rounded-full text-xs font-medium mt-1"
+                              style={{
+                                backgroundColor: `${argonTheme.colors.primary.main}15`,
+                                color: argonTheme.colors.primary.main
+                              }}
+                            >
+                              {record.record_type_display || record.record_type}
+                            </span>
                           </div>
                         </div>
 
-                        {record.subjective && (
-                          <div className="mb-3">
+                        {/* Queixa Principal */}
+                        {record.chief_complaint && (
+                          <div className="mb-3 p-3 rounded-lg" style={{ backgroundColor: argonTheme.colors.grey[50] }}>
                             <p className="text-xs font-bold uppercase mb-1" style={{ color: argonTheme.colors.text.secondary }}>
-                              Subjetivo
+                              Queixa / Relato
                             </p>
-                            <p className="text-sm" style={{ color: argonTheme.colors.text.primary }}>{record.subjective}</p>
+                            <p className="text-sm whitespace-pre-wrap" style={{ color: argonTheme.colors.text.primary }}>{record.chief_complaint}</p>
                           </div>
                         )}
 
-                        {record.objective && (
-                          <div className="mb-3">
+                        {/* Exame Físico */}
+                        {record.physical_exam && (
+                          <div className="mb-3 p-3 rounded-lg" style={{ backgroundColor: argonTheme.colors.grey[50] }}>
                             <p className="text-xs font-bold uppercase mb-1" style={{ color: argonTheme.colors.text.secondary }}>
-                              Objetivo
+                              Exame Físico
                             </p>
-                            <p className="text-sm" style={{ color: argonTheme.colors.text.primary }}>{record.objective}</p>
+                            <p className="text-sm whitespace-pre-wrap" style={{ color: argonTheme.colors.text.primary }}>{record.physical_exam}</p>
                           </div>
                         )}
 
-                        {record.assessment && (
-                          <div className="mb-3">
+                        {/* Diagnóstico */}
+                        {record.diagnosis && (
+                          <div className="mb-3 p-3 rounded-lg" style={{ backgroundColor: argonTheme.colors.grey[50] }}>
                             <p className="text-xs font-bold uppercase mb-1" style={{ color: argonTheme.colors.text.secondary }}>
-                              Avaliação
+                              Diagnóstico
                             </p>
-                            <p className="text-sm" style={{ color: argonTheme.colors.text.primary }}>{record.assessment}</p>
+                            <p className="text-sm whitespace-pre-wrap" style={{ color: argonTheme.colors.text.primary }}>{record.diagnosis}</p>
                           </div>
                         )}
 
-                        {record.plan && (
-                          <div>
+                        {/* Plano de Tratamento */}
+                        {record.treatment_plan && (
+                          <div className="mb-3 p-3 rounded-lg" style={{ backgroundColor: argonTheme.colors.grey[50] }}>
                             <p className="text-xs font-bold uppercase mb-1" style={{ color: argonTheme.colors.text.secondary }}>
-                              Plano
+                              Condutas / Procedimentos
                             </p>
-                            <p className="text-sm" style={{ color: argonTheme.colors.text.primary }}>{record.plan}</p>
+                            <p className="text-sm whitespace-pre-wrap" style={{ color: argonTheme.colors.text.primary }}>{record.treatment_plan}</p>
                           </div>
                         )}
 
-                        {record.notes && (
+                        {/* Observações */}
+                        {record.observations && (
                           <div className="mt-3 pt-3 border-t" style={{ borderColor: argonTheme.colors.grey[100] }}>
+                            <p className="text-xs font-bold uppercase mb-1" style={{ color: argonTheme.colors.text.secondary }}>
+                              Observações
+                            </p>
+                            <p className="text-sm whitespace-pre-wrap" style={{ color: argonTheme.colors.text.primary }}>{record.observations}</p>
+                          </div>
+                        )}
+
+                        {/* Criado por */}
+                        {record.created_by_name && (
+                          <div className="mt-3 pt-2 border-t flex items-center gap-2" style={{ borderColor: argonTheme.colors.grey[100] }}>
+                            <User className="w-3 h-3" style={{ color: argonTheme.colors.text.secondary }} />
                             <p className="text-xs" style={{ color: argonTheme.colors.text.secondary }}>
-                              <strong>Observações:</strong> {record.notes}
+                              Registrado por: <strong>{record.created_by_name}</strong>
                             </p>
                           </div>
                         )}
@@ -630,6 +728,233 @@ export default function PatientRecordsPage() {
           </div>
         )}
       </div>
+
+      {/* Evolution Modal */}
+      {showEvolutionModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+            onClick={closeEvolutionModal}
+          />
+
+          {/* Modal Content */}
+          <div
+            className="relative w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto rounded-2xl shadow-2xl"
+            style={{ backgroundColor: argonTheme.colors.background.paper }}
+          >
+            {/* Header */}
+            <div
+              className="sticky top-0 z-10 flex items-center justify-between p-6 border-b"
+              style={{
+                background: argonTheme.gradients.primary,
+                borderColor: argonTheme.colors.grey[100]
+              }}
+            >
+              <div className="flex items-center gap-3 text-white">
+                <Activity className="w-6 h-6" />
+                <h2 className="text-xl font-bold">Nova Evolução</h2>
+              </div>
+              <button
+                onClick={closeEvolutionModal}
+                className="p-2 rounded-full hover:bg-white/20 transition-colors text-white"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Form */}
+            <form onSubmit={handleEvolutionSubmit} className="p-6 space-y-5">
+              {/* Título */}
+              <div>
+                <label
+                  className="block text-sm font-semibold mb-2"
+                  style={{ color: argonTheme.colors.text.primary }}
+                >
+                  Título *
+                </label>
+                <input
+                  type="text"
+                  value={evolutionForm.title}
+                  onChange={(e) => setEvolutionForm(prev => ({ ...prev, title: e.target.value }))}
+                  className="w-full px-4 py-3 rounded-lg border transition-all focus:outline-none focus:ring-2"
+                  style={{
+                    borderColor: argonTheme.colors.grey[200],
+                    backgroundColor: argonTheme.colors.grey[50],
+                    color: argonTheme.colors.text.primary
+                  }}
+                  placeholder="Ex: Evolução - Sessão 5"
+                  required
+                />
+              </div>
+
+              {/* Tipo de Registro */}
+              <div>
+                <label
+                  className="block text-sm font-semibold mb-2"
+                  style={{ color: argonTheme.colors.text.primary }}
+                >
+                  Tipo de Registro
+                </label>
+                <select
+                  value={evolutionForm.record_type}
+                  onChange={(e) => setEvolutionForm(prev => ({ ...prev, record_type: e.target.value }))}
+                  className="w-full px-4 py-3 rounded-lg border transition-all focus:outline-none focus:ring-2"
+                  style={{
+                    borderColor: argonTheme.colors.grey[200],
+                    backgroundColor: argonTheme.colors.grey[50],
+                    color: argonTheme.colors.text.primary
+                  }}
+                >
+                  <option value="EVOLUCAO">Evolução</option>
+                  <option value="AVALIACAO">Avaliação</option>
+                  <option value="PROCEDIMENTO">Procedimento</option>
+                  <option value="DIAGNOSTICO">Diagnóstico</option>
+                  <option value="OUTROS">Outros</option>
+                </select>
+              </div>
+
+              {/* Queixa Principal */}
+              <div>
+                <label
+                  className="block text-sm font-semibold mb-2"
+                  style={{ color: argonTheme.colors.text.primary }}
+                >
+                  Queixa / Relato do Paciente
+                </label>
+                <textarea
+                  value={evolutionForm.chief_complaint}
+                  onChange={(e) => setEvolutionForm(prev => ({ ...prev, chief_complaint: e.target.value }))}
+                  className="w-full px-4 py-3 rounded-lg border transition-all focus:outline-none focus:ring-2 min-h-[80px] resize-y"
+                  style={{
+                    borderColor: argonTheme.colors.grey[200],
+                    backgroundColor: argonTheme.colors.grey[50],
+                    color: argonTheme.colors.text.primary
+                  }}
+                  placeholder="O que o paciente relata nesta sessão?"
+                />
+              </div>
+
+              {/* Exame Físico */}
+              <div>
+                <label
+                  className="block text-sm font-semibold mb-2"
+                  style={{ color: argonTheme.colors.text.primary }}
+                >
+                  Exame Físico / Avaliação
+                </label>
+                <textarea
+                  value={evolutionForm.physical_exam}
+                  onChange={(e) => setEvolutionForm(prev => ({ ...prev, physical_exam: e.target.value }))}
+                  className="w-full px-4 py-3 rounded-lg border transition-all focus:outline-none focus:ring-2 min-h-[80px] resize-y"
+                  style={{
+                    borderColor: argonTheme.colors.grey[200],
+                    backgroundColor: argonTheme.colors.grey[50],
+                    color: argonTheme.colors.text.primary
+                  }}
+                  placeholder="Achados do exame físico, testes e medições..."
+                />
+              </div>
+
+              {/* Diagnóstico */}
+              <div>
+                <label
+                  className="block text-sm font-semibold mb-2"
+                  style={{ color: argonTheme.colors.text.primary }}
+                >
+                  Diagnóstico / Impressão Clínica
+                </label>
+                <textarea
+                  value={evolutionForm.diagnosis}
+                  onChange={(e) => setEvolutionForm(prev => ({ ...prev, diagnosis: e.target.value }))}
+                  className="w-full px-4 py-3 rounded-lg border transition-all focus:outline-none focus:ring-2 min-h-[60px] resize-y"
+                  style={{
+                    borderColor: argonTheme.colors.grey[200],
+                    backgroundColor: argonTheme.colors.grey[50],
+                    color: argonTheme.colors.text.primary
+                  }}
+                  placeholder="Diagnóstico fisioterapêutico..."
+                />
+              </div>
+
+              {/* Plano de Tratamento / Condutas */}
+              <div>
+                <label
+                  className="block text-sm font-semibold mb-2"
+                  style={{ color: argonTheme.colors.text.primary }}
+                >
+                  Condutas / Procedimentos Realizados
+                </label>
+                <textarea
+                  value={evolutionForm.treatment_plan}
+                  onChange={(e) => setEvolutionForm(prev => ({ ...prev, treatment_plan: e.target.value }))}
+                  className="w-full px-4 py-3 rounded-lg border transition-all focus:outline-none focus:ring-2 min-h-[80px] resize-y"
+                  style={{
+                    borderColor: argonTheme.colors.grey[200],
+                    backgroundColor: argonTheme.colors.grey[50],
+                    color: argonTheme.colors.text.primary
+                  }}
+                  placeholder="Técnicas aplicadas, exercícios, recursos utilizados..."
+                />
+              </div>
+
+              {/* Observações */}
+              <div>
+                <label
+                  className="block text-sm font-semibold mb-2"
+                  style={{ color: argonTheme.colors.text.primary }}
+                >
+                  Observações
+                </label>
+                <textarea
+                  value={evolutionForm.observations}
+                  onChange={(e) => setEvolutionForm(prev => ({ ...prev, observations: e.target.value }))}
+                  className="w-full px-4 py-3 rounded-lg border transition-all focus:outline-none focus:ring-2 min-h-[60px] resize-y"
+                  style={{
+                    borderColor: argonTheme.colors.grey[200],
+                    backgroundColor: argonTheme.colors.grey[50],
+                    color: argonTheme.colors.text.primary
+                  }}
+                  placeholder="Observações adicionais, orientações ao paciente..."
+                />
+              </div>
+
+              {/* Buttons */}
+              <div className="flex gap-3 pt-4 border-t" style={{ borderColor: argonTheme.colors.grey[100] }}>
+                <button
+                  type="button"
+                  onClick={closeEvolutionModal}
+                  className="flex-1 px-4 py-3 rounded-lg font-semibold transition-all"
+                  style={{
+                    backgroundColor: argonTheme.colors.grey[100],
+                    color: argonTheme.colors.text.secondary
+                  }}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingEvolution}
+                  className="flex-1 px-4 py-3 rounded-lg font-semibold text-white flex items-center justify-center gap-2 transition-all disabled:opacity-50"
+                  style={{ background: argonTheme.gradients.primary }}
+                >
+                  {savingEvolution ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Salvando...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-4 h-4" />
+                      Salvar Evolução
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </ArgonLayout>
   );
 }

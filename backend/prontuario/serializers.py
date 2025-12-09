@@ -123,12 +123,15 @@ class MedicalRecordListSerializer(serializers.ModelSerializer):
     """
     patient_name = serializers.CharField(source='patient.full_name', read_only=True)
     record_type_display = serializers.CharField(source='get_record_type_display', read_only=True)
+    created_by_name = serializers.CharField(source='created_by.get_full_name', read_only=True)
     
     class Meta:
         model = MedicalRecord
         fields = [
             'id', 'patient', 'patient_name', 'record_type', 'record_type_display',
-            'title', 'record_date', 'created_at'
+            'title', 'chief_complaint', 'physical_exam', 'diagnosis', 
+            'treatment_plan', 'observations', 'record_date', 'created_at',
+            'created_by', 'created_by_name'
         ]
 
 

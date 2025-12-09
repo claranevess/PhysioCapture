@@ -19,7 +19,10 @@ Este guia fornece instruções passo a passo para configurar, executar e testar 
 
 Antes de começar, certifique-se de ter instalado em seu sistema:
 
-- **Python 3.13 ou superior** - [Download](https://www.python.org/downloads/)
+#### Python 3.12
+- **Python 3.12** - [Download](https://www.python.org/downloads/release/python-3120/)
+
+### Outras Dependências:
 - **Node.js 18 ou superior** - [Download](https://nodejs.org/)
 - **npm ou yarn** - Gerenciador de pacotes JavaScript
 - **Git** - Sistema de controle de versão

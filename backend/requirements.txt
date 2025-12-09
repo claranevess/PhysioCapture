@@ -2,9 +2,6 @@
 Django==5.2.8
 djangorestframework==3.15.2
 
-# Database
-mysqlclient==2.2.7
-
 # CORS
 django-cors-headers==4.6.0
 
@@ -12,10 +9,10 @@ django-cors-headers==4.6.0
 djangorestframework-simplejwt==5.3.1
 
 # Image handling
-Pillow==11.0.0
+Pillow
 
 # OCR (Optical Character Recognition)
-pytesseract==0.3.10
+pytesseract
 pdf2image==1.17.0
 
 # Utilities
@@ -23,10 +20,6 @@ python-dateutil==2.9.0
 
 # AI/ML for document processing
 opencv-python==4.10.0.84
-
-# Dependência 'magic' com suporte para múltiplos SOs
-python-magic==0.4.15 ; sys_platform != 'win32'
-python-magic-bin==0.4.15 ; sys_platform == 'win32'
 
 # Hugging Face (Assistente de IA)
 huggingface_hub
