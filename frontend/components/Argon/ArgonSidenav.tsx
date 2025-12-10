@@ -164,7 +164,16 @@ export default function ArgonSidenav() {
               {navItems
                 .filter(item => {
                   // Check onlyFor (exclusive access)
-                  if (item.onlyFor && item.onlyFor !== currentUser?.user_type) return false;
+                  if (item.onlyFor) {
+                    // 'GESTOR' means both GESTOR_GERAL and GESTOR_FILIAL
+                    if (item.onlyFor === 'GESTOR') {
+                      if (currentUser?.user_type !== 'GESTOR_GERAL' && currentUser?.user_type !== 'GESTOR_FILIAL') {
+                        return false;
+                      }
+                    } else if (item.onlyFor !== currentUser?.user_type) {
+                      return false;
+                    }
+                  }
                   // Check hideFor (hide from specific types)
                   if (item.hideFor && currentUser?.user_type && item.hideFor.includes(currentUser.user_type as any)) return false;
                   return true;

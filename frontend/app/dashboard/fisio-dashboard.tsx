@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { apiRoutes } from "@/lib/api";
 import {
   ArgonStatsCard,
@@ -22,7 +23,14 @@ import {
   BarChart3,
   PieChart,
   Sparkles,
-  FolderOpen
+  FolderOpen,
+  ArrowRightLeft,
+  Send,
+  Inbox,
+  AlertCircle,
+  CheckCircle,
+  XCircle,
+  Clock
 } from 'lucide-react';
 import {
   AreaChart,
@@ -44,7 +52,20 @@ interface FisioDashboardProps {
   currentUser: any;
 }
 
+interface TransferRequest {
+  id: number;
+  patient_name: string;
+  to_fisioterapeuta_name: string;
+  to_filial_name: string;
+  reason: string;
+  status: string;
+  status_display: string;
+  created_at: string;
+  is_inter_filial: boolean;
+}
+
 export default function FisioDashboard({ currentUser }: FisioDashboardProps) {
+  const router = useRouter();
   const [stats, setStats] = useState<any>({
     totalPatients: 0,
     documentsToday: 0,
@@ -57,9 +78,11 @@ export default function FisioDashboard({ currentUser }: FisioDashboardProps) {
     serviceDistribution: []
   });
   const [loading, setLoading] = useState(true);
+  const [myTransferRequests, setMyTransferRequests] = useState<TransferRequest[]>([]);
 
   useEffect(() => {
     loadDashboardData();
+    loadMyTransferRequests();
   }, []);
 
   const loadDashboardData = async () => {
@@ -70,6 +93,30 @@ export default function FisioDashboard({ currentUser }: FisioDashboardProps) {
       console.error('Erro ao carregar dados do dashboard:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadMyTransferRequests = async () => {
+    try {
+      const response = await apiRoutes.transferRequests.list();
+      const data = Array.isArray(response.data) ? response.data : [];
+      // Pegar apenas as últimas 3 solicitações pendentes
+      setMyTransferRequests(data.filter((r: TransferRequest) => r.status === 'PENDENTE').slice(0, 3));
+    } catch (error) {
+      console.error('Erro ao carregar solicitações:', error);
+    }
+  };
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'PENDENTE':
+        return <AlertCircle className="w-4 h-4 text-yellow-500" />;
+      case 'APROVADA':
+        return <CheckCircle className="w-4 h-4 text-green-500" />;
+      case 'REJEITADA':
+        return <XCircle className="w-4 h-4 text-red-500" />;
+      default:
+        return <Clock className="w-4 h-4 text-gray-500" />;
     }
   };
 
@@ -299,28 +346,77 @@ export default function FisioDashboard({ currentUser }: FisioDashboardProps) {
             href="/patients/new"
           />
           <ArgonActionCard
+            title="Agendar Consulta"
+            description="Nova sessão"
+            icon={<Calendar className="w-6 h-6" />}
+            gradient="info"
+            href="/agenda"
+          />
+          <ArgonActionCard
+            title="Transferir Paciente"
+            description="Solicitar transferência"
+            icon={<Send className="w-6 h-6" />}
+            gradient="warning"
+            href="/patients/transferencias"
+          />
+          <ArgonActionCard
             title="Digitalizar"
             description="Capturar docs"
             icon={<Camera className="w-6 h-6" />}
             gradient="success"
             href="/documents/digitize"
           />
-          <ArgonActionCard
-            title="Buscar"
-            description="Encontrar paciente"
-            icon={<Search className="w-6 h-6" />}
-            gradient="error"
-            href="/patients"
-          />
-          <ArgonActionCard
-            title="Documentos"
-            description="Ver arquivos"
-            icon={<FolderOpen className="w-6 h-6" />}
-            gradient="warning"
-            href="/documents"
-          />
         </div>
       </div>
+
+      {/* Minhas Solicitações de Transferência */}
+      {myTransferRequests.length > 0 && (
+        <ArgonInfoCard
+          title="Minhas Solicitações de Transferência"
+          subtitle="Aguardando aprovação do gestor"
+          icon={<Send className="w-5 h-5" />}
+          iconGradient="warning"
+          footer={
+            <Link
+              href="/patients/transferencias"
+              className="flex items-center justify-center gap-2 text-sm font-medium transition-colors"
+              style={{ color: argonTheme.colors.warning.main }}
+            >
+              Ver todas as solicitações
+              <ChevronRight className="w-4 h-4" />
+            </Link>
+          }
+        >
+          <div className="space-y-3">
+            {myTransferRequests.map((request) => (
+              <div
+                key={request.id}
+                className="p-3 bg-yellow-50 border-l-4 border-yellow-400 rounded-r-lg"
+              >
+                <div className="flex items-start justify-between">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      {getStatusIcon(request.status)}
+                      <p className="font-medium" style={{ color: argonTheme.colors.text.primary }}>
+                        {request.patient_name}
+                      </p>
+                    </div>
+                    <p className="text-sm text-gray-500 mt-1">
+                      → {request.to_fisioterapeuta_name} ({request.to_filial_name})
+                    </p>
+                    <p className="text-xs text-gray-400 mt-1">
+                      {new Date(request.created_at).toLocaleDateString('pt-BR')}
+                    </p>
+                  </div>
+                  <span className="px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-700">
+                    {request.status_display}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </ArgonInfoCard>
+      )}
 
       {/* Recent Patients */}
       {stats.recentPatients.length > 0 && (

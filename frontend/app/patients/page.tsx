@@ -145,30 +145,38 @@ export default function PatientsPage() {
               className="text-2xl font-bold mb-1"
               style={{ color: argonTheme.colors.text.primary }}
             >
-              Pacientes
+              {currentUser?.user_type === 'FISIOTERAPEUTA' ? 'Meus Pacientes' : 'Pacientes'}
             </h1>
             {currentUser && (
               <p 
                 className="text-sm mb-1 font-medium"
                 style={{ color: argonTheme.colors.primary.main }}
               >
-                {currentUser.user_type === 'GESTOR' 
-                  ? '📊 Todos os pacientes da clínica' 
-                  : '👤 Meus pacientes'}
+                {currentUser.user_type === 'GESTOR_GERAL' 
+                  ? '📊 Todos os pacientes da rede' 
+                  : currentUser.user_type === 'GESTOR_FILIAL'
+                    ? '🏢 Pacientes da filial'
+                    : currentUser.user_type === 'FISIOTERAPEUTA'
+                      ? '👨‍⚕️ Pacientes sob minha responsabilidade'
+                      : currentUser.user_type === 'ATENDENTE'
+                        ? '🏢 Pacientes da filial'
+                        : '👤 Meus pacientes'}
               </p>
             )}
             <p style={{ color: argonTheme.colors.text.secondary }}>
               {filteredPatients.length} paciente(s) encontrado(s)
             </p>
           </div>
-          <Link
-            href="/patients/new"
-            className="px-4 py-2 rounded-lg font-medium text-white transition-all flex items-center gap-2 hover:shadow-lg"
-            style={{ background: argonTheme.gradients.primary }}
-          >
-            <UserPlus className="w-4 h-4" />
-            Novo Paciente
-          </Link>
+          {currentUser?.user_type !== 'GESTOR_GERAL' && (
+            <Link
+              href="/patients/new"
+              className="px-4 py-2 rounded-lg font-medium text-white transition-all flex items-center gap-2 hover:shadow-lg"
+              style={{ background: argonTheme.gradients.primary }}
+            >
+              <UserPlus className="w-4 h-4" />
+              Novo Paciente
+            </Link>
+          )}
         </div>
 
         {/* Search */}
