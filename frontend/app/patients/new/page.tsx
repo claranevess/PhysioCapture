@@ -201,7 +201,7 @@ export default function NewPatientPage() {
         submitData.append('photo', formData.photo);
       }
 
-      const response = await api.post('/prontuario/patients/', submitData, {
+      const response = await api.post('/api/prontuario/patients/', submitData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
 
@@ -211,8 +211,8 @@ export default function NewPatientPage() {
       console.error('Error creating patient:', err);
       setError(
         err.response?.data?.detail ||
-          err.response?.data?.error ||
-          'Erro ao cadastrar paciente. Tente novamente.'
+        err.response?.data?.error ||
+        'Erro ao cadastrar paciente. Tente novamente.'
       );
     } finally {
       setLoading(false);
@@ -483,11 +483,10 @@ export default function NewPatientPage() {
             <button
               type="submit"
               disabled={loading}
-              className={`flex-1 py-3 rounded-lg font-semibold text-white ${
-                loading
+              className={`flex-1 py-3 rounded-lg font-semibold text-white ${loading
                   ? 'bg-blue-400 cursor-not-allowed'
                   : 'bg-blue-600 hover:bg-blue-700'
-              }`}
+                }`}
             >
               {loading ? '⏳ Cadastrando...' : '✓ Cadastrar Paciente'}
             </button>

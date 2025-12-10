@@ -69,6 +69,21 @@ export const apiRoutes = {
     delete: (id: number) => api.delete(`/api/prontuario/patients/${id}/`),
     medicalRecords: (id: number) => api.get(`/api/prontuario/patients/${id}/medical_records/`),
     search: (query: string) => api.get(`/api/prontuario/patients/search/?q=${query}`),
+    transfer: (id: number, data: { to_fisioterapeuta_id: number; reason?: string }) =>
+      api.post(`/api/prontuario/patients/${id}/transfer/`, data),
+    availableForTransfer: () => api.get('/api/prontuario/patients/available_for_transfer/'),
+    transferHistory: (id: number) => api.get(`/api/prontuario/patients/${id}/transfer_history/`),
+  },
+  filiais: {
+    list: () => api.get('/api/auth/filiais/'),
+  },
+  fisioterapeutas: {
+    list: (filialId?: number) => api.get('/api/auth/fisioterapeutas/', {
+      params: filialId ? { filial_id: filialId } : {}
+    }),
+    forTransfer: (patientId: number) => api.get('/api/auth/fisioterapeutas/transfer/', {
+      params: { patient_id: patientId }
+    }),
   },
   medicalRecords: {
     list: (params?: any) => api.get('/api/prontuario/medical-records/', { params }),

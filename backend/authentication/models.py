@@ -46,11 +46,55 @@ class Clinica(models.Model):
         return self.nome
 
 
+class Filial(models.Model):
+    """
+    FILIAL DA REDE DE CLÍNICAS
+    Cada clínica pode ter múltiplas filiais.
+    Exemplo: FisioVida Recife, FisioVida Olinda
+    """
+    clinica = models.ForeignKey(
+        Clinica,
+        on_delete=models.CASCADE,
+        related_name='filiais',
+        verbose_name='Clínica'
+    )
+    nome = models.CharField(max_length=255, verbose_name='Nome da Filial')
+    
+    # Endereço
+    endereco = models.CharField(max_length=255, verbose_name='Endereço')
+    numero = models.CharField(max_length=10, verbose_name='Número')
+    complemento = models.CharField(max_length=100, blank=True, verbose_name='Complemento')
+    bairro = models.CharField(max_length=100, verbose_name='Bairro')
+    cidade = models.CharField(max_length=100, verbose_name='Cidade')
+    estado = models.CharField(max_length=2, verbose_name='Estado')
+    cep = models.CharField(max_length=9, verbose_name='CEP')
+    
+    # Contato
+    telefone = models.CharField(max_length=20, verbose_name='Telefone')
+    email = models.EmailField(blank=True, verbose_name='E-mail')
+    
+    # Status
+    ativa = models.BooleanField(default=True, verbose_name='Ativa')
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        verbose_name = 'Filial'
+        verbose_name_plural = 'Filiais'
+        ordering = ['nome']
+        unique_together = [['clinica', 'nome']]
+    
+    def __str__(self):
+        return f"{self.nome} ({self.clinica.nome})"
+
+
 class User(AbstractUser):
     """
     USUÁRIOS DO SISTEMA - Apenas quem pode fazer LOGIN
     
-    GESTOR: Gerencia a clínica, cadastra fisioterapeutas, acessa relatórios globais
+    GESTOR_GERAL: Gerencia toda a rede de clínicas (todas as filiais)
+    GESTOR_FILIAL: Gerencia apenas sua filial específica
     FISIOTERAPEUTA: Atende pacientes, gerencia prontuários clínicos
     ATENDENTE: Recepção, agenda, cadastro básico de pacientes
     
@@ -58,7 +102,8 @@ class User(AbstractUser):
     """
     
     USER_TYPE_CHOICES = [
-        ('GESTOR', 'Gestor da Clínica'),
+        ('GESTOR_GERAL', 'Gestor Geral da Rede'),
+        ('GESTOR_FILIAL', 'Gestor da Filial'),
         ('FISIOTERAPEUTA', 'Fisioterapeuta'),
         ('ATENDENTE', 'Atendente/Recepção'),
     ]
@@ -69,6 +114,17 @@ class User(AbstractUser):
         on_delete=models.CASCADE,
         related_name='usuarios',
         verbose_name='Clínica'
+    )
+    
+    # FILIAL - Filial do usuário (null para GESTOR_GERAL que acessa todas)
+    filial = models.ForeignKey(
+        Filial,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='usuarios',
+        verbose_name='Filial',
+        help_text='Filial do usuário. Deixe vazio para Gestor Geral.'
     )
     
     user_type = models.CharField(
@@ -128,14 +184,25 @@ class User(AbstractUser):
         ordering = ['-created_at']
     
     def __str__(self):
-        return f"{self.get_full_name() or self.username} ({self.get_user_type_display()}) - {self.clinica.nome}"
+        filial_info = f" - {self.filial.nome}" if self.filial else " (Rede)"
+        return f"{self.get_full_name() or self.username} ({self.get_user_type_display()}){filial_info}"
     
     # ==================== PROPRIEDADES DE PAPEL ====================
     
     @property
+    def is_gestor_geral(self):
+        """Gestor geral da rede - pode gerenciar todas as filiais"""
+        return self.user_type == 'GESTOR_GERAL'
+    
+    @property
+    def is_gestor_filial(self):
+        """Gestor de filial - gerencia apenas sua filial"""
+        return self.user_type == 'GESTOR_FILIAL'
+    
+    @property
     def is_gestor(self):
-        """Gestor da clínica - pode gerenciar tudo"""
-        return self.user_type == 'GESTOR'
+        """Qualquer tipo de gestor (geral ou filial)"""
+        return self.is_gestor_geral or self.is_gestor_filial
     
     @property
     def is_fisioterapeuta(self):
@@ -150,13 +217,34 @@ class User(AbstractUser):
     # ==================== MÉTODOS DE PERMISSÃO ====================
     
     def can_manage_users(self):
-        """Apenas gestores podem criar/editar usuários"""
+        """
+        Verifica se pode gerenciar usuários.
+        - Gestor Geral: gerencia todos os usuários da rede
+        - Gestor Filial: gerencia apenas usuários da sua filial
+        """
         return self.is_gestor
+    
+    def can_manage_user(self, target_user):
+        """
+        Verifica se pode gerenciar um usuário específico.
+        - Gestor Geral: pode gerenciar qualquer usuário da rede
+        - Gestor Filial: pode gerenciar apenas usuários da sua filial
+        """
+        if self.clinica_id != target_user.clinica_id:
+            return False
+        
+        if self.is_gestor_geral:
+            return True
+        
+        if self.is_gestor_filial:
+            return target_user.filial_id == self.filial_id
+        
+        return False
     
     def can_access_clinical_data(self):
         """
         Verifica se pode acessar dados clínicos detalhados
-        - Gestor e Fisioterapeuta: SIM
+        - Gestores e Fisioterapeutas: SIM
         - Atendente: NÃO
         """
         return self.is_gestor or self.is_fisioterapeuta
@@ -164,7 +252,7 @@ class User(AbstractUser):
     def can_manage_schedule(self):
         """
         Verifica se pode gerenciar agenda/sessões
-        - Gestor e Atendente: podem criar/editar/cancelar sessões
+        - Gestores e Atendente: podem criar/editar/cancelar sessões
         - Fisioterapeuta: apenas visualiza sua própria agenda
         """
         return self.is_gestor or self.is_atendente
@@ -174,38 +262,62 @@ class User(AbstractUser):
         return self.is_gestor
     
     def can_view_reports(self):
-        """Apenas gestores podem ver relatórios globais"""
+        """
+        Verifica se pode ver relatórios.
+        - Gestor Geral: relatórios globais de toda a rede
+        - Gestor Filial: relatórios apenas da sua filial
+        """
         return self.is_gestor
+    
+    def can_access_filial(self, filial):
+        """
+        Verifica se pode acessar uma filial específica.
+        - Gestor Geral: acessa todas as filiais da rede
+        - Outros: apenas sua própria filial
+        """
+        if filial.clinica_id != self.clinica_id:
+            return False
+        
+        if self.is_gestor_geral:
+            return True
+        
+        return self.filial_id == filial.id
     
     def can_access_patient(self, paciente):
         """
-        Verifica se o usuário pode acessar um paciente
-        - Gestor: acessa todos os pacientes da sua clínica
+        Verifica se o usuário pode acessar um paciente.
+        - Gestor Geral: acessa todos os pacientes da rede
+        - Gestor Filial: acessa todos os pacientes da sua filial
         - Fisioterapeuta: acessa apenas seus próprios pacientes
-        - Atendente: acessa dados básicos de todos os pacientes (não clínicos)
+        - Atendente: acessa dados básicos de todos os pacientes da filial
         """
         # Sempre verificar se pertence à mesma clínica
         if self.clinica_id != paciente.clinica_id:
             return False
         
-        # Gestor acessa todos
-        if self.is_gestor:
+        # Gestor Geral acessa todos
+        if self.is_gestor_geral:
             return True
+        
+        # Gestor Filial acessa todos da sua filial
+        if self.is_gestor_filial:
+            return paciente.filial_id == self.filial_id
         
         # Fisioterapeuta acessa apenas seus pacientes
         if self.is_fisioterapeuta:
             return paciente.fisioterapeuta_id == self.id
         
-        # Atendente acessa todos (mas apenas dados básicos, não clínicos)
+        # Atendente acessa todos da filial (mas apenas dados básicos, não clínicos)
         if self.is_atendente:
-            return True
+            return paciente.filial_id == self.filial_id
         
         return False
     
     def can_access_patient_clinical_data(self, paciente):
         """
-        Verifica se pode acessar dados CLÍNICOS de um paciente
-        - Gestor: acessa todos
+        Verifica se pode acessar dados CLÍNICOS de um paciente.
+        - Gestor Geral: acessa todos
+        - Gestor Filial: acessa todos da filial
         - Fisioterapeuta: apenas seus pacientes
         - Atendente: NUNCA
         """
@@ -213,6 +325,36 @@ class User(AbstractUser):
             return False
         
         return self.can_access_patient(paciente)
+    
+    def can_transfer_patient(self, paciente, to_filial=None):
+        """
+        Verifica se pode transferir um paciente.
+        - Gestor Geral: pode transferir qualquer paciente para qualquer filial
+        - Gestor Filial: pode transferir pacientes da sua filial para qualquer filial
+        - Fisioterapeuta: pode transferir seus próprios pacientes (apenas intra-filial)
+        """
+        # Verificar se pode acessar o paciente
+        if not self.can_access_patient(paciente):
+            return False
+        
+        # Gestor Geral pode transferir para qualquer lugar
+        if self.is_gestor_geral:
+            return True
+        
+        # Gestor Filial pode transferir pacientes da sua filial
+        if self.is_gestor_filial:
+            return paciente.filial_id == self.filial_id
+        
+        # Fisioterapeuta pode transferir seus pacientes dentro da mesma filial
+        if self.is_fisioterapeuta:
+            if paciente.fisioterapeuta_id != self.id:
+                return False
+            # Se for transferência inter-filial, não pode
+            if to_filial and to_filial.id != self.filial_id:
+                return False
+            return True
+        
+        return False
 
 
 class Lead(models.Model):

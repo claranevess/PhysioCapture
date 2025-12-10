@@ -3,13 +3,16 @@ from rest_framework.decorators import api_view, permission_classes, action
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from django.contrib.auth import authenticate, login, logout
-from .models import User, Lead
+from .models import User, Filial, Lead
 from .serializers import (
     UserSerializer,
+    UserListSerializer,
     UserRegistrationSerializer,
     LoginSerializer,
     UserProfileSerializer,
-    LeadSerializer
+    LeadSerializer,
+    FilialSerializer,
+    FilialListSerializer
 )
 
 
@@ -37,24 +40,10 @@ def create_lead(request):
     """
     Captura de interesse de novas clínicas (Landing Page)
     POST /api/auth/leads/
-    
-    Body:
-    {
-        "nome_clinica": "Fisio Saúde",
-        "nome_responsavel": "Dr. João Silva",
-        "email": "contato@fisiosaude.com.br",
-        "telefone": "(81) 99999-9999",
-        "num_fisioterapeutas": 5,
-        "mensagem": "Gostaria de conhecer o sistema"
-    }
     """
     serializer = LeadSerializer(data=request.data)
     if serializer.is_valid():
         lead = serializer.save()
-        
-        # TODO: Enviar email para equipe Core Hive
-        # TODO: Enviar email de confirmação para a clínica
-        
         return Response({
             'message': 'Interesse registrado com sucesso!',
             'info': 'Nossa equipe entrará em contato em breve.',
@@ -103,13 +92,11 @@ def logout_user(request):
     """
     Logout de usuários
     POST /api/auth/logout/
-    
-    Permite logout mesmo sem autenticação para evitar erros
     """
     try:
         logout(request)
     except Exception:
-        pass  # Ignora erros se não houver sessão
+        pass
     
     return Response({
         'message': 'Logout realizado com sucesso!'
@@ -122,9 +109,6 @@ def current_user(request):
     """
     Retorna informações do usuário logado
     GET /api/auth/me/
-    
-    Usa a sessão do Django para identificar o usuário atual.
-    Fallback: dados no localStorage do frontend (enviados no header).
     """
     # Prioridade 1: Sessão Django autenticada
     if request.user.is_authenticated:
@@ -151,13 +135,12 @@ def current_user(request):
 
 
 @api_view(['PUT', 'PATCH'])
-@permission_classes([AllowAny])  # SEM AUTENTICAÇÃO - APENAS DESENVOLVIMENTO
+@permission_classes([AllowAny])
 def update_profile(request):
     """
     Atualiza perfil do usuário logado
     PUT/PATCH /api/auth/profile/
     """
-    # Para desenvolvimento: pegar primeiro usuário
     user = User.objects.filter(is_active_user=True).first()
     if not user:
         return Response({'error': 'Nenhum usuário encontrado'}, status=404)
@@ -177,19 +160,12 @@ def update_profile(request):
 
 
 @api_view(['POST'])
-@permission_classes([AllowAny])  # SEM AUTENTICAÇÃO - APENAS DESENVOLVIMENTO
+@permission_classes([AllowAny])
 def change_password(request):
     """
     Altera a senha do usuário logado
     POST /api/auth/change-password/
-    
-    Body:
-    {
-        "old_password": "senha_atual",
-        "new_password": "nova_senha"
-    }
     """
-    # Para desenvolvimento: pegar primeiro usuário
     user = User.objects.filter(is_active_user=True).first()
     if not user:
         return Response({'error': 'Nenhum usuário encontrado'}, status=404)
@@ -202,19 +178,16 @@ def change_password(request):
             'error': 'Senha atual e nova senha são obrigatórias.'
         }, status=status.HTTP_400_BAD_REQUEST)
     
-    # Verifica se a senha atual está correta
     if not user.check_password(old_password):
         return Response({
             'error': 'Senha atual incorreta.'
         }, status=status.HTTP_400_BAD_REQUEST)
     
-    # Valida tamanho mínimo da nova senha
     if len(new_password) < 6:
         return Response({
             'error': 'A nova senha deve ter pelo menos 6 caracteres.'
         }, status=status.HTTP_400_BAD_REQUEST)
     
-    # Atualiza a senha
     user.set_password(new_password)
     user.save()
     
@@ -223,98 +196,198 @@ def change_password(request):
     }, status=status.HTTP_200_OK)
 
 
+# ==================== FILIAIS ====================
+
 @api_view(['GET'])
-@permission_classes([AllowAny])  # SEM AUTENTICAÇÃO - APENAS DESENVOLVIMENTO
+@permission_classes([AllowAny])
+def list_filiais(request):
+    """
+    Lista filiais da clínica do usuário
+    GET /api/auth/filiais/
+    GET /api/auth/filiais/?user_id=1
+    
+    Retorna filiais que o usuário tem acesso:
+    - Gestor Geral: todas as filiais da rede
+    - Outros: apenas sua própria filial
+    """
+    user_id = request.query_params.get('user_id')
+    if user_id:
+        try:
+            user = User.objects.get(id=int(user_id), is_active_user=True)
+        except (User.DoesNotExist, ValueError):
+            user = None
+    else:
+        user = User.objects.filter(is_active_user=True).order_by('id').first()
+    
+    if not user or not user.clinica:
+        return Response([], status=status.HTTP_200_OK)
+    
+    if user.is_gestor_geral:
+        # Gestor Geral vê todas as filiais da rede
+        filiais = Filial.objects.filter(clinica=user.clinica, ativa=True)
+    else:
+        # Outros veem apenas sua própria filial
+        if user.filial:
+            filiais = Filial.objects.filter(id=user.filial.id)
+        else:
+            filiais = Filial.objects.none()
+    
+    serializer = FilialListSerializer(filiais, many=True)
+    return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
 def list_fisioterapeutas(request):
     """
-    Lista fisioterapeutas da clínica
+    Lista fisioterapeutas da clínica/filial
     GET /api/auth/fisioterapeutas/
-    GET /api/auth/fisioterapeutas/?user_id=1  (simula usuário específico)
+    GET /api/auth/fisioterapeutas/?user_id=1
+    GET /api/auth/fisioterapeutas/?filial_id=1
     
-    DESENVOLVIMENTO: Sem autenticação
+    Filtros baseados no tipo de usuário:
+    - Gestor Geral: todos os fisioterapeutas da rede (pode filtrar por filial)
+    - Gestor Filial: apenas fisioterapeutas da sua filial
+    - Fisioterapeuta: lista para referência (transferência intra-filial)
     """
     from prontuario.models import Patient
     from django.db.models import Count
     
-    # Para desenvolvimento: simular usuário gestor
     user_id = request.query_params.get('user_id')
+    filial_id = request.query_params.get('filial_id')
+    
     if user_id:
         try:
-            simulated_user = User.objects.get(id=user_id)
-        except User.DoesNotExist:
-            simulated_user = User.objects.filter(user_type='GESTOR', is_active_user=True).order_by('id').first()
+            simulated_user = User.objects.get(id=int(user_id), is_active_user=True)
+        except (User.DoesNotExist, ValueError):
+            simulated_user = None
     else:
-        # Pegar primeiro gestor ativo (ordenado por ID para consistência)
-        simulated_user = User.objects.filter(user_type='GESTOR', is_active_user=True).order_by('id').first()
+        simulated_user = User.objects.filter(is_active_user=True).order_by('id').first()
     
     if not simulated_user or not simulated_user.clinica:
-        # Se não houver gestor, retornar todos os fisioterapeutas
-        fisioterapeutas = User.objects.filter(
-            user_type='FISIOTERAPEUTA'
-        ).annotate(
-            patient_count=Count('meus_pacientes')
-        ).order_by('first_name', 'last_name')
-    else:
-        # Buscar fisioterapeutas da mesma clínica do usuário simulado
-        fisioterapeutas = User.objects.filter(
-            clinica=simulated_user.clinica,
-            user_type='FISIOTERAPEUTA'
-        ).annotate(
-            patient_count=Count('meus_pacientes')  # Conta os pacientes associados
-        ).order_by('first_name', 'last_name')
+        return Response([], status=status.HTTP_200_OK)
     
-    # Serializar os dados
+    # Base queryset: fisioterapeutas da mesma clínica
+    queryset = User.objects.filter(
+        clinica=simulated_user.clinica,
+        user_type='FISIOTERAPEUTA',
+        is_active_user=True
+    )
+    
+    # Filtrar por filial
+    if filial_id:
+        queryset = queryset.filter(filial_id=filial_id)
+    elif simulated_user.is_gestor_filial:
+        # Gestor de filial vê apenas fisios da sua filial
+        queryset = queryset.filter(filial=simulated_user.filial)
+    elif simulated_user.is_fisioterapeuta:
+        # Fisioterapeuta vê apenas fisios da sua filial
+        queryset = queryset.filter(filial=simulated_user.filial)
+    # Gestor Geral vê todos (sem filtro adicional)
+    
+    queryset = queryset.annotate(
+        patient_count=Count('meus_pacientes')
+    ).order_by('first_name', 'last_name')
+    
     data = []
-    for fisio in fisioterapeutas:
+    for fisio in queryset:
         data.append({
             'id': fisio.id,
             'username': fisio.username,
             'first_name': fisio.first_name,
             'last_name': fisio.last_name,
+            'full_name': fisio.get_full_name(),
             'email': fisio.email,
             'phone': fisio.phone,
             'crefito': fisio.crefito,
             'especialidade': fisio.especialidade,
             'is_active_user': fisio.is_active_user,
             'patient_count': fisio.patient_count,
+            'filial_id': fisio.filial_id,
+            'filial_nome': fisio.filial.nome if fisio.filial else None,
+        })
+    
+    return Response(data, status=status.HTTP_200_OK)
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def list_fisioterapeutas_for_transfer(request):
+    """
+    Lista fisioterapeutas disponíveis para receber transferência de paciente
+    GET /api/auth/fisioterapeutas/transfer/
+    GET /api/auth/fisioterapeutas/transfer/?user_id=1&patient_id=1
+    
+    Retorna fisioterapeutas que podem receber o paciente:
+    - Gestor Geral: todos os fisioterapeutas da rede
+    - Gestor Filial: todos os fisioterapeutas da rede (pode transferir inter-filial)
+    - Fisioterapeuta: apenas fisioterapeutas da mesma filial
+    """
+    from django.db.models import Count
+    
+    user_id = request.query_params.get('user_id')
+    
+    if user_id:
+        try:
+            user = User.objects.get(id=int(user_id), is_active_user=True)
+        except (User.DoesNotExist, ValueError):
+            user = None
+    else:
+        user = User.objects.filter(is_active_user=True).order_by('id').first()
+    
+    if not user or not user.clinica:
+        return Response([], status=status.HTTP_200_OK)
+    
+    # Base queryset
+    queryset = User.objects.filter(
+        clinica=user.clinica,
+        user_type='FISIOTERAPEUTA',
+        is_active_user=True
+    )
+    
+    # Fisioterapeuta só pode transferir para mesma filial
+    if user.is_fisioterapeuta and user.filial:
+        queryset = queryset.filter(filial=user.filial)
+    
+    # Excluir o próprio usuário se for fisioterapeuta
+    if user.is_fisioterapeuta:
+        queryset = queryset.exclude(id=user.id)
+    
+    queryset = queryset.annotate(
+        patient_count=Count('meus_pacientes')
+    ).order_by('filial__nome', 'first_name', 'last_name')
+    
+    data = []
+    for fisio in queryset:
+        data.append({
+            'id': fisio.id,
+            'full_name': fisio.get_full_name(),
+            'especialidade': fisio.especialidade,
+            'patient_count': fisio.patient_count,
+            'filial_id': fisio.filial_id,
+            'filial_nome': fisio.filial.nome if fisio.filial else None,
         })
     
     return Response(data, status=status.HTTP_200_OK)
 
 
 @api_view(['POST'])
-@permission_classes([AllowAny])  # SEM AUTENTICAÇÃO - APENAS DESENVOLVIMENTO
+@permission_classes([AllowAny])
 def create_fisioterapeuta(request):
     """
     Cria um novo fisioterapeuta na clínica do gestor logado
     POST /api/auth/fisioterapeutas/create/
-    
-    DESENVOLVIMENTO: Sem autenticação - usa primeiro gestor ativo
-    
-    Body (JSON):
-    {
-        "username": "fisio.exemplo",
-        "email": "fisio@exemplo.com",
-        "password": "senha123",
-        "first_name": "Nome",
-        "last_name": "Sobrenome",
-        "cpf": "000.000.000-00",
-        "phone": "(00) 00000-0000",
-        "crefito": "CREFITO-X/000000",
-        "especialidade": "Especialidade"
-    }
     """
-    # Para desenvolvimento: simular primeiro gestor ativo
     user_id = request.query_params.get('user_id')
     if user_id:
         try:
-            simulated_user = User.objects.get(id=user_id)
+            simulated_user = User.objects.get(id=int(user_id))
         except User.DoesNotExist:
-            simulated_user = User.objects.filter(user_type='GESTOR', is_active_user=True).order_by('id').first()
+            simulated_user = User.objects.filter(user_type__in=['GESTOR_GERAL', 'GESTOR_FILIAL'], is_active_user=True).order_by('id').first()
     else:
-        simulated_user = User.objects.filter(user_type='GESTOR', is_active_user=True).order_by('id').first()
+        simulated_user = User.objects.filter(user_type__in=['GESTOR_GERAL', 'GESTOR_FILIAL'], is_active_user=True).order_by('id').first()
     
-    if not simulated_user or simulated_user.user_type != 'GESTOR':
+    if not simulated_user or not simulated_user.is_gestor:
         return Response(
             {'error': 'Apenas gestores podem cadastrar fisioterapeutas.'},
             status=status.HTTP_403_FORBIDDEN
@@ -349,8 +422,26 @@ def create_fisioterapeuta(request):
             status=status.HTTP_400_BAD_REQUEST
         )
     
+    # Determinar filial
+    filial_id = request.data.get('filial_id')
+    if filial_id:
+        try:
+            filial = Filial.objects.get(id=filial_id, clinica=simulated_user.clinica)
+        except Filial.DoesNotExist:
+            return Response(
+                {'error': 'Filial não encontrada.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+    elif simulated_user.is_gestor_filial:
+        # Gestor de filial cria na sua própria filial
+        filial = simulated_user.filial
+    else:
+        return Response(
+            {'error': 'Filial é obrigatória.'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
     try:
-        # Criar fisioterapeuta
         fisioterapeuta = User.objects.create(
             username=request.data['username'],
             email=request.data['email'],
@@ -360,13 +451,13 @@ def create_fisioterapeuta(request):
             phone=request.data.get('phone', ''),
             crefito=request.data.get('crefito', ''),
             especialidade=request.data.get('especialidade', ''),
-            clinica=simulated_user.clinica,  # Associar à clínica do gestor
+            clinica=simulated_user.clinica,
+            filial=filial,
             user_type='FISIOTERAPEUTA',
             is_active=True,
             is_active_user=True,
         )
         
-        # Definir senha
         fisioterapeuta.set_password(request.data['password'])
         fisioterapeuta.save()
         
@@ -380,6 +471,8 @@ def create_fisioterapeuta(request):
                 'last_name': fisioterapeuta.last_name,
                 'crefito': fisioterapeuta.crefito,
                 'especialidade': fisioterapeuta.especialidade,
+                'filial_id': fisioterapeuta.filial_id,
+                'filial_nome': fisioterapeuta.filial.nome if fisioterapeuta.filial else None,
             }
         }, status=status.HTTP_201_CREATED)
         
@@ -399,10 +492,8 @@ class UserViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
     
     def get_queryset(self):
-        # Apenas admins podem ver todos os usuários
-        if self.request.user.is_admin or self.request.user.is_staff:
+        if self.request.user.is_staff:
             return User.objects.all()
-        # Outros veem apenas seu próprio perfil
         return User.objects.filter(id=self.request.user.id)
     
     @action(detail=False, methods=['get'])

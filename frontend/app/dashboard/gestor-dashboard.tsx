@@ -1,31 +1,32 @@
 'use client';
 
 import { useEffect, useState } from "react";
-import { apiRoutes } from "@/lib/api";
+import { useRouter } from "next/navigation";
+import { apiRoutes, api } from "@/lib/api";
 import {
   ArgonStatsCard,
   ArgonInfoCard,
-  ArgonCard
 } from "@/components/Argon/ArgonCard";
 import { argonTheme } from "@/lib/argon-theme";
 import {
   Users,
-  FileText,
+  Building2,
   UserPlus,
   TrendingUp,
-  Activity,
-  BarChart3,
-  PieChart,
-  Sparkles
+  ArrowRightLeft,
+  Trophy,
+  Sparkles,
+  MapPin,
+  ChevronRight,
+  Clock,
+  UserCheck,
+  Database,
+  X,
+  Search
 } from 'lucide-react';
 import {
-  AreaChart,
-  Area,
-  BarChart,
-  Bar,
-  PieChart as RechartsPie,
-  Pie,
-  Cell,
+  LineChart,
+  Line,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -38,21 +39,77 @@ interface GestorDashboardProps {
   currentUser: any;
 }
 
+interface FilialStats {
+  id: number;
+  nome: string;
+  cidade: string;
+  cor: string;
+  totalPacientes: number;
+  novosPacientes: number;
+  fisioterapeutas: number;
+  sessoesRealizadas: number;
+}
+
+interface Transferencia {
+  id: number;
+  paciente: string;
+  paciente_id: number;
+  de_fisio: string;
+  para_fisio: string;
+  de_filial: string;
+  para_filial: string;
+  data: string;
+  inter_filial: boolean;
+}
+
+interface FisioRanking {
+  id: number;
+  nome: string;
+  filial: string;
+  pacientes: number;
+  sessoes: number;
+}
+
+interface Patient {
+  id: number;
+  full_name: string;
+  filial_nome: string;
+  fisioterapeuta_name: string;
+}
+
+interface Fisioterapeuta {
+  id: number;
+  full_name: string;
+  filial_nome: string;
+}
+
 export default function GestorDashboard({ currentUser }: GestorDashboardProps) {
+  const router = useRouter();
   const [stats, setStats] = useState<any>({
-    totalPatients: 0,
-    newPatientsThisMonth: 0,
-    totalDocuments: 0,
-    documentsToday: 0,
-    fisioterapeutasAtivos: 0,
-    activeRecords: 0,
-    monthlyGrowth: 0,
-    weeklyData: [],
-    monthlyTrend: [],
-    serviceDistribution: [],
-    fisioterapeutasMetrics: []
+    totalPacientes: 0,
+    totalFisioterapeutas: 0,
+    totalFiliais: 0,
+    novosPacientesMes: 0,
+    crescimentoMensal: 0,
+    totalTransferenciasMes: 0,
+    pacientesDisponiveisTransferencia: 0,
+    filiaisStats: [],
+    transferenciasRecentes: [],
+    rankingFisioterapeutas: [],
+    comparativoFiliais: [],
+    rede: { nome: '' }
   });
   const [loading, setLoading] = useState(true);
+
+  // Modal de transferência
+  const [showTransferModal, setShowTransferModal] = useState(false);
+  const [patients, setPatients] = useState<Patient[]>([]);
+  const [fisioterapeutas, setFisioterapeutas] = useState<Fisioterapeuta[]>([]);
+  const [selectedPatient, setSelectedPatient] = useState<number | null>(null);
+  const [selectedFisio, setSelectedFisio] = useState<number | null>(null);
+  const [transferReason, setTransferReason] = useState('');
+  const [transferLoading, setTransferLoading] = useState(false);
+  const [searchPatient, setSearchPatient] = useState('');
 
   useEffect(() => {
     loadDashboardData();
@@ -69,6 +126,55 @@ export default function GestorDashboard({ currentUser }: GestorDashboardProps) {
     }
   };
 
+  const loadTransferData = async () => {
+    try {
+      const [patientsRes, fisiosRes] = await Promise.all([
+        api.get('/api/prontuario/patients/'),
+        api.get('/api/auth/fisioterapeutas/')
+      ]);
+      setPatients(patientsRes.data);
+      setFisioterapeutas(fisiosRes.data);
+    } catch (error) {
+      console.error('Erro ao carregar dados para transferência:', error);
+    }
+  };
+
+  const openTransferModal = () => {
+    loadTransferData();
+    setShowTransferModal(true);
+  };
+
+  const handleTransfer = async () => {
+    if (!selectedPatient || !selectedFisio) {
+      alert('Selecione o paciente e o fisioterapeuta de destino');
+      return;
+    }
+
+    setTransferLoading(true);
+    try {
+      await apiRoutes.patients.transfer(selectedPatient, {
+        to_fisioterapeuta_id: selectedFisio,
+        reason: transferReason
+      });
+
+      alert('Paciente transferido com sucesso!');
+      setShowTransferModal(false);
+      setSelectedPatient(null);
+      setSelectedFisio(null);
+      setTransferReason('');
+      loadDashboardData(); // Recarrega dados
+    } catch (error: any) {
+      alert(error.response?.data?.error || 'Erro ao transferir paciente');
+    } finally {
+      setTransferLoading(false);
+    }
+  };
+
+  const navigateToFilial = (filialId: number) => {
+    // Navega para a página de detalhes da filial
+    router.push(`/filiais/${filialId}`);
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
@@ -80,283 +186,303 @@ export default function GestorDashboard({ currentUser }: GestorDashboardProps) {
             <Sparkles className="w-8 h-8 text-white" />
           </div>
           <p className="font-medium" style={{ color: argonTheme.colors.text.primary }}>
-            Carregando dashboard do gestor...
+            Carregando dashboard da rede...
           </p>
         </div>
       </div>
     );
   }
 
+  // Preparar dados para gráfico comparativo
+  const prepareChartData = () => {
+    if (!stats.comparativoFiliais || stats.comparativoFiliais.length === 0) return [];
+    const months = stats.comparativoFiliais[0]?.dados?.map((d: any) => d.mes) || [];
+    return months.map((mes: string, idx: number) => {
+      const dataPoint: any = { mes };
+      stats.comparativoFiliais.forEach((filial: any) => {
+        dataPoint[filial.filial] = filial.dados[idx]?.valor || 0;
+      });
+      return dataPoint;
+    });
+  };
+
+  const chartData = prepareChartData();
+
+  // Filtrar pacientes pela busca
+  const filteredPatients = patients.filter(p =>
+    p.full_name.toLowerCase().includes(searchPatient.toLowerCase())
+  );
+
   return (
     <div className="space-y-6">
-      {/* Header com boas-vindas */}
+      {/* Modal de Transferência */}
+      {showTransferModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl">
+            <div className="p-6 border-b border-gray-200 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div
+                  className="w-10 h-10 rounded-xl flex items-center justify-center"
+                  style={{ background: argonTheme.gradients.primary }}
+                >
+                  <ArrowRightLeft className="w-5 h-5 text-white" />
+                </div>
+                <h2 className="text-xl font-bold" style={{ color: argonTheme.colors.text.primary }}>
+                  Transferir Paciente
+                </h2>
+              </div>
+              <button onClick={() => setShowTransferModal(false)} className="text-gray-400 hover:text-gray-600">
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-6">
+              {/* Seleção de Paciente */}
+              <div>
+                <label className="block text-sm font-semibold mb-2" style={{ color: argonTheme.colors.text.primary }}>
+                  1. Selecione o Paciente
+                </label>
+                <div className="relative mb-2">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <input
+                    type="text"
+                    placeholder="Buscar paciente..."
+                    value={searchPatient}
+                    onChange={(e) => setSearchPatient(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                  />
+                </div>
+                <div className="max-h-48 overflow-y-auto border border-gray-200 rounded-lg">
+                  {filteredPatients.map(patient => (
+                    <div
+                      key={patient.id}
+                      onClick={() => setSelectedPatient(patient.id)}
+                      className={`p-3 cursor-pointer hover:bg-gray-50 border-b border-gray-100 last:border-b-0 ${selectedPatient === patient.id ? 'bg-teal-50 border-l-4 border-l-teal-500' : ''
+                        }`}
+                    >
+                      <p className="font-medium" style={{ color: argonTheme.colors.text.primary }}>
+                        {patient.full_name}
+                      </p>
+                      <p className="text-sm text-gray-500">
+                        {patient.filial_nome} • Fisio: {patient.fisioterapeuta_name}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Seleção de Fisioterapeuta */}
+              <div>
+                <label className="block text-sm font-semibold mb-2" style={{ color: argonTheme.colors.text.primary }}>
+                  2. Fisioterapeuta de Destino
+                </label>
+                <select
+                  value={selectedFisio || ''}
+                  onChange={(e) => setSelectedFisio(Number(e.target.value))}
+                  className="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                >
+                  <option value="">Selecione o fisioterapeuta...</option>
+                  {fisioterapeutas.map(fisio => (
+                    <option key={fisio.id} value={fisio.id}>
+                      {fisio.full_name} - {fisio.filial_nome}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Motivo */}
+              <div>
+                <label className="block text-sm font-semibold mb-2" style={{ color: argonTheme.colors.text.primary }}>
+                  3. Motivo da Transferência
+                </label>
+                <textarea
+                  value={transferReason}
+                  onChange={(e) => setTransferReason(e.target.value)}
+                  placeholder="Ex: Paciente mudou de endereço, mudança de horário..."
+                  rows={3}
+                  className="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                />
+              </div>
+            </div>
+
+            <div className="p-6 border-t border-gray-200 flex gap-3">
+              <button
+                onClick={() => setShowTransferModal(false)}
+                className="flex-1 py-3 px-4 border border-gray-200 rounded-xl font-semibold text-gray-600 hover:bg-gray-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleTransfer}
+                disabled={transferLoading || !selectedPatient || !selectedFisio}
+                className="flex-1 py-3 px-4 rounded-xl font-semibold text-white disabled:opacity-50"
+                style={{ background: argonTheme.gradients.primary }}
+              >
+                {transferLoading ? 'Transferindo...' : 'Confirmar Transferência'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Header */}
       <div className="mb-6">
-        <h1 className="text-3xl font-bold" style={{ color: argonTheme.colors.text.primary }}>
-          Dashboard da Clínica
-        </h1>
-        <p className="text-lg mt-2" style={{ color: argonTheme.colors.text.secondary }}>
-          Bem-vindo, {currentUser?.first_name}! Visão geral da clínica {currentUser?.clinica_name || ''}
-        </p>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div
+              className="w-12 h-12 rounded-xl flex items-center justify-center"
+              style={{ background: argonTheme.gradients.primary }}
+            >
+              <Building2 className="w-6 h-6 text-white" />
+            </div>
+            <div>
+              <h1 className="text-3xl font-bold" style={{ color: argonTheme.colors.text.primary }}>
+                Dashboard da Rede
+              </h1>
+              <p className="text-lg" style={{ color: argonTheme.colors.text.secondary }}>
+                {stats.rede?.nome || 'Rede FisioVida'} • {stats.totalFiliais} filiais
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={openTransferModal}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl text-white font-medium shadow-lg hover:shadow-xl transition-shadow"
+            style={{ background: argonTheme.gradients.primary }}
+          >
+            <ArrowRightLeft className="w-5 h-5" />
+            Transferir Paciente
+          </button>
+        </div>
       </div>
 
-      {/* Stats Cards Grid */}
+      {/* Visão Geral */}
+      {/* Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         <ArgonStatsCard
           title="Total de Pacientes"
-          value={stats.totalPatients}
+          value={stats.totalPacientes}
           icon={<Users className="w-7 h-7" />}
           iconGradient="primary"
-          trend={{
-            value: stats.monthlyGrowth,
-            label: "vs mês passado",
-            isPositive: stats.monthlyGrowth >= 0,
-          }}
+          trend={{ value: stats.crescimentoMensal, label: "vs mês passado", isPositive: stats.crescimentoMensal >= 0 }}
         />
-
         <ArgonStatsCard
-          title="Novos Pacientes (Mês)"
-          value={stats.newPatientsThisMonth}
-          icon={<UserPlus className="w-7 h-7" />}
+          title="Fisioterapeutas"
+          value={stats.totalFisioterapeutas}
+          icon={<UserCheck className="w-7 h-7" />}
           iconGradient="success"
-          trend={{
-            value: stats.newPatientsThisMonth,
-            label: "este mês",
-            isPositive: true,
-          }}
+          trend={{ value: stats.totalFiliais, label: "filiais ativas", isPositive: true }}
         />
-
         <ArgonStatsCard
-          title="Documentos Digitalizados"
-          value={stats.totalDocuments}
-          icon={<FileText className="w-7 h-7" />}
-          iconGradient="error"
-          trend={{
-            value: stats.documentsToday,
-            label: "hoje",
-            isPositive: true,
-          }}
+          title="Novos (Mês)"
+          value={stats.novosPacientesMes}
+          icon={<UserPlus className="w-7 h-7" />}
+          iconGradient="info"
         />
-
         <ArgonStatsCard
-          title="Fisioterapeutas Ativos"
-          value={stats.fisioterapeutasAtivos}
-          icon={<Activity className="w-7 h-7" />}
+          title="Transferências"
+          value={stats.totalTransferenciasMes}
+          icon={<ArrowRightLeft className="w-7 h-7" />}
           iconGradient="warning"
-          trend={{
-            value: stats.activeRecords,
-            label: "prontuários ativos",
-            isPositive: true,
-          }}
         />
       </div>
 
-      {/* Charts Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Area Chart - Crescimento */}
-        <div className="lg:col-span-2">
-          <ArgonInfoCard
-            title="Crescimento de Pacientes"
-            subtitle="Últimos 8 meses"
-            icon={<BarChart3 className="w-5 h-5" />}
-            iconGradient="primary"
+      {/* Cards de Filiais Clicáveis */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {stats.filiaisStats?.map((filial: FilialStats) => (
+          <div
+            key={filial.id}
+            onClick={() => navigateToFilial(filial.id)}
+            className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-xl transition-all cursor-pointer group"
           >
-            <ResponsiveContainer width="100%" height={280}>
-              <AreaChart data={stats.monthlyTrend}>
-                <defs>
-                  <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#009688" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="#009688" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                <XAxis
-                  dataKey="month"
-                  stroke={argonTheme.colors.text.secondary}
-                  style={{ fontSize: '12px' }}
-                />
-                <YAxis
-                  stroke={argonTheme.colors.text.secondary}
-                  style={{ fontSize: '12px' }}
-                />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: 'white',
-                    border: '1px solid #e0e0e0',
-                    borderRadius: '12px',
-                    boxShadow: argonTheme.shadows.lg,
-                  }}
-                />
-                <Area
-                  type="monotone"
-                  dataKey="value"
-                  stroke={argonTheme.colors.primary.main}
-                  strokeWidth={3}
-                  fillOpacity={1}
-                  fill="url(#colorValue)"
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          </ArgonInfoCard>
-        </div>
-
-        {/* Métricas dos Fisioterapeutas */}
-        <ArgonInfoCard
-          title="Equipe de Fisioterapeutas"
-          subtitle="Desempenho e pacientes"
-          icon={<Users className="w-5 h-5" />}
-          iconGradient="secondary"
-        >
-          <div className="space-y-3">
-            {stats.fisioterapeutasMetrics && stats.fisioterapeutasMetrics.length > 0 ? (
-              stats.fisioterapeutasMetrics.map((fisio: any, index: number) => (
+            <div className="flex items-start justify-between mb-4">
+              <div className="flex items-center gap-3">
                 <div
-                  key={index}
-                  className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+                  className="w-12 h-12 rounded-xl flex items-center justify-center"
+                  style={{ background: filial.cor }}
                 >
-                  <div className="flex items-center gap-3">
-                    <div
-                      className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold"
-                      style={{ background: argonTheme.gradients.primary }}
-                    >
-                      {fisio.name?.charAt(0) || 'F'}
-                    </div>
-                    <div>
-                      <p className="font-medium" style={{ color: argonTheme.colors.text.primary }}>
-                        {fisio.name || 'Fisioterapeuta'}
-                      </p>
-                      <p className="text-xs" style={{ color: argonTheme.colors.text.secondary }}>
-                        {fisio.specialty || 'Fisioterapia Geral'}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-lg font-bold" style={{ color: argonTheme.colors.primary.main }}>
-                      {fisio.patients || 0}
-                    </p>
-                    <p className="text-xs" style={{ color: argonTheme.colors.text.secondary }}>
-                      pacientes
-                    </p>
-                  </div>
+                  <Building2 className="w-6 h-6 text-white" />
                 </div>
-              ))
-            ) : (
-              <div className="text-center py-6 text-gray-400">
-                <Users className="w-12 h-12 mx-auto mb-2 opacity-30" />
-                <p>Nenhum fisioterapeuta cadastrado</p>
+                <div>
+                  <h3 className="font-bold text-lg" style={{ color: argonTheme.colors.text.primary }}>
+                    {filial.nome}
+                  </h3>
+                  <p className="text-sm flex items-center gap-1" style={{ color: argonTheme.colors.text.secondary }}>
+                    <MapPin className="w-3 h-3" /> {filial.cidade}
+                  </p>
+                </div>
               </div>
-            )}
+              <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-gray-600 group-hover:translate-x-1 transition-all" />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="bg-gray-50 rounded-xl p-3 text-center">
+                <p className="text-2xl font-bold" style={{ color: filial.cor }}>{filial.totalPacientes}</p>
+                <p className="text-xs text-gray-500">Pacientes</p>
+              </div>
+              <div className="bg-gray-50 rounded-xl p-3 text-center">
+                <p className="text-2xl font-bold" style={{ color: argonTheme.colors.success.main }}>{filial.fisioterapeutas}</p>
+                <p className="text-xs text-gray-500">Fisios</p>
+              </div>
+              <div className="bg-gray-50 rounded-xl p-3 text-center">
+                <p className="text-2xl font-bold" style={{ color: argonTheme.colors.info.main }}>+{filial.novosPacientes}</p>
+                <p className="text-xs text-gray-500">Novos/Mês</p>
+              </div>
+              <div className="bg-gray-50 rounded-xl p-3 text-center">
+                <p className="text-2xl font-bold" style={{ color: argonTheme.colors.warning.main }}>{filial.sessoesRealizadas}</p>
+                <p className="text-xs text-gray-500">Sessões</p>
+              </div>
+            </div>
           </div>
-        </ArgonInfoCard>
+        ))}
       </div>
 
-      {/* Bar Chart - Atividade Semanal */}
-      <ArgonInfoCard
-        title="Atividade da Semana"
-        subtitle="Pacientes, consultas e documentos da clínica"
-        icon={<Activity className="w-5 h-5" />}
-        iconGradient="info"
-      >
-        <ResponsiveContainer width="100%" height={280}>
-          <BarChart data={stats.weeklyData}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-            <XAxis
-              dataKey="day"
-              stroke={argonTheme.colors.text.secondary}
-              style={{ fontSize: '12px' }}
-            />
-            <YAxis
-              stroke={argonTheme.colors.text.secondary}
-              style={{ fontSize: '12px' }}
-            />
-            <Tooltip
-              contentStyle={{
-                backgroundColor: 'white',
-                border: '1px solid #e0e0e0',
-                borderRadius: '12px',
-                boxShadow: argonTheme.shadows.lg,
-              }}
-            />
-            <Legend />
-            <Bar dataKey="pacientes" fill="#009688" radius={[8, 8, 0, 0]} />
-            <Bar dataKey="consultas" fill="#66BB6A" radius={[8, 8, 0, 0]} />
-            <Bar dataKey="documentos" fill="#FF8099" radius={[8, 8, 0, 0]} />
-          </BarChart>
-        </ResponsiveContainer>
-      </ArgonInfoCard>
-
-      {/* Tabela de Fisioterapeutas */}
-      {stats.fisioterapeutasMetrics.length > 0 && (
-        <ArgonInfoCard
-          title="Desempenho dos Fisioterapeutas"
-          subtitle="Métricas dos últimos 30 dias"
-          icon={<Users className="w-5 h-5" />}
-          iconGradient="primary"
-        >
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-gray-200">
-                  <th
-                    className="text-left py-3 px-4 font-semibold text-sm"
-                    style={{ color: argonTheme.colors.text.secondary }}
-                  >
-                    Fisioterapeuta
-                  </th>
-                  <th
-                    className="text-center py-3 px-4 font-semibold text-sm"
-                    style={{ color: argonTheme.colors.text.secondary }}
-                  >
-                    Pacientes
-                  </th>
-                  <th
-                    className="text-center py-3 px-4 font-semibold text-sm"
-                    style={{ color: argonTheme.colors.text.secondary }}
-                  >
-                    Consultas
-                  </th>
-                  <th
-                    className="text-center py-3 px-4 font-semibold text-sm"
-                    style={{ color: argonTheme.colors.text.secondary }}
-                  >
-                    Documentos
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {stats.fisioterapeutasMetrics.map((fisio: any) => (
-                  <tr key={fisio.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
-                    <td
-                      className="py-3 px-4 font-medium"
-                      style={{ color: argonTheme.colors.text.primary }}
-                    >
-                      {fisio.name}
-                    </td>
-                    <td
-                      className="py-3 px-4 text-center font-semibold"
-                      style={{ color: argonTheme.colors.primary.main }}
-                    >
-                      {fisio.pacientes}
-                    </td>
-                    <td
-                      className="py-3 px-4 text-center font-semibold"
-                      style={{ color: argonTheme.colors.success.main }}
-                    >
-                      {fisio.consultas}
-                    </td>
-                    <td
-                      className="py-3 px-4 text-center font-semibold"
-                      style={{ color: argonTheme.colors.error.main }}
-                    >
-                      {fisio.documentos}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+      {/* Gráfico Comparativo */}
+      {chartData.length > 0 && (
+        <ArgonInfoCard title="Comparativo entre Filiais" subtitle="Novos pacientes por mês" icon={<TrendingUp className="w-5 h-5" />} iconGradient="primary">
+          <ResponsiveContainer width="100%" height={300}>
+            <LineChart data={chartData}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+              <XAxis dataKey="mes" stroke={argonTheme.colors.text.secondary} />
+              <YAxis stroke={argonTheme.colors.text.secondary} />
+              <Tooltip contentStyle={{ backgroundColor: 'white', border: '1px solid #e0e0e0', borderRadius: '12px' }} />
+              <Legend />
+              {stats.comparativoFiliais?.map((filial: any, idx: number) => (
+                <Line key={filial.filial} type="monotone" dataKey={filial.filial} stroke={stats.filiaisStats[idx]?.cor || '#009688'} strokeWidth={3} dot={{ r: 4 }} />
+              ))}
+            </LineChart>
+          </ResponsiveContainer>
         </ArgonInfoCard>
       )}
+
+      {/* Ranking */}
+      <ArgonInfoCard title="Top Fisioterapeutas" subtitle="Ranking da rede" icon={<Trophy className="w-5 h-5" />} iconGradient="warning">
+        <div className="space-y-3">
+          {stats.rankingFisioterapeutas?.slice(0, 5).map((fisio: FisioRanking, idx: number) => (
+            <div key={fisio.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
+              <div className="flex items-center gap-4">
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-white ${idx === 0 ? 'bg-yellow-500' : idx === 1 ? 'bg-gray-400' : idx === 2 ? 'bg-amber-600' : 'bg-gray-300'
+                  }`}>
+                  {idx + 1}
+                </div>
+                <div>
+                  <p className="font-semibold">{fisio.nome}</p>
+                  <p className="text-sm text-gray-500">{fisio.filial}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-6 text-center">
+                <div>
+                  <p className="font-bold" style={{ color: argonTheme.colors.primary.main }}>{fisio.pacientes}</p>
+                  <p className="text-xs text-gray-500">Pacientes</p>
+                </div>
+                <div>
+                  <p className="font-bold" style={{ color: argonTheme.colors.success.main }}>{fisio.sessoes}</p>
+                  <p className="text-xs text-gray-500">Sessões</p>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </ArgonInfoCard>
     </div>
   );
 }
-

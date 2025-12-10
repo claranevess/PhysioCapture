@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { apiRoutes } from '@/lib/api';
 import { Document, DocumentCategory } from '@/lib/types';
 import { format } from 'date-fns';
+import { getCurrentUser, CurrentUser } from '@/lib/getCurrentUser';
 import ArgonLayout from '@/components/Argon/ArgonLayout';
 import { ArgonCard, ArgonStatsCard, ArgonInfoCard } from '@/components/Argon/ArgonCard';
 import { ArgonButton } from '@/components/Argon/ArgonButton';
@@ -35,10 +36,15 @@ export default function DocumentsPage() {
 
   // Estado para modal de visualização
   const [viewingDoc, setViewingDoc] = useState<Document | null>(null);
+  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
 
   useEffect(() => {
     loadData();
+    getCurrentUser().then(user => setCurrentUser(user));
   }, []);
+
+  // GESTOR_GERAL só pode visualizar
+  const canManageDocuments = currentUser?.user_type !== 'GESTOR_GERAL';
 
   const loadData = async () => {
     try {
@@ -190,15 +196,17 @@ export default function DocumentsPage() {
               Gerencie e visualize todos os documentos digitalizados
             </p>
           </div>
-          <Link href="/documents/digitize">
-            <ArgonButton
-              variant="gradient"
-              color="primary"
-              icon={<Camera className="w-5 h-5" />}
-            >
-              Digitalizar
-            </ArgonButton>
-          </Link>
+          {canManageDocuments && (
+            <Link href="/documents/digitize">
+              <ArgonButton
+                variant="gradient"
+                color="primary"
+                icon={<Camera className="w-5 h-5" />}
+              >
+                Digitalizar
+              </ArgonButton>
+            </Link>
+          )}
         </div>
         {/* Stats Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -340,15 +348,17 @@ export default function DocumentsPage() {
                 : 'Comece digitalizando seu primeiro documento'
               }
             </p>
-            <Link href="/documents/digitize">
-              <ArgonButton
-                variant="gradient"
-                color="primary"
-                icon={<Camera className="w-5 h-5" />}
-              >
-                Digitalizar Documento
-              </ArgonButton>
-            </Link>
+            {canManageDocuments && (
+              <Link href="/documents/digitize">
+                <ArgonButton
+                  variant="gradient"
+                  color="primary"
+                  icon={<Camera className="w-5 h-5" />}
+                >
+                  Digitalizar Documento
+                </ArgonButton>
+              </Link>
+            )}
           </ArgonCard>
         ) : (
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -467,15 +477,17 @@ export default function DocumentsPage() {
                   >
                     Baixar
                   </ArgonButton>
-                  <ArgonButton
-                    variant="outline"
-                    color="error"
-                    size="sm"
-                    icon={<Trash2 className="w-4 h-4" />}
-                    onClick={() => handleDelete(doc.id, doc.title)}
-                  >
-                    Excluir
-                  </ArgonButton>
+                  {canManageDocuments && (
+                    <ArgonButton
+                      variant="outline"
+                      color="error"
+                      size="sm"
+                      icon={<Trash2 className="w-4 h-4" />}
+                      onClick={() => handleDelete(doc.id, doc.title)}
+                    >
+                      Excluir
+                    </ArgonButton>
+                  )}
                 </div>
               </ArgonCard>
             ))}

@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
-from .models import User, Clinica, Lead
+from .models import User, Clinica, Filial, Lead
 
 
 @admin.register(Clinica)
@@ -30,15 +30,39 @@ class ClinicaAdmin(admin.ModelAdmin):
     )
 
 
+@admin.register(Filial)
+class FilialAdmin(admin.ModelAdmin):
+    list_display = ['nome', 'clinica', 'cidade', 'estado', 'ativa', 'created_at']
+    list_filter = ['ativa', 'clinica', 'estado', 'created_at']
+    search_fields = ['nome', 'cidade', 'email']
+    readonly_fields = ['created_at', 'updated_at']
+    
+    fieldsets = (
+        ('Informações Básicas', {
+            'fields': ('clinica', 'nome', 'ativa')
+        }),
+        ('Endereço', {
+            'fields': ('endereco', 'numero', 'complemento', 'bairro', 'cidade', 'estado', 'cep')
+        }),
+        ('Contato', {
+            'fields': ('telefone', 'email')
+        }),
+        ('Metadados', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
+
+
 @admin.register(User)
 class UserAdmin(BaseUserAdmin):
-    list_display = ['username', 'email', 'first_name', 'last_name', 'clinica', 'user_type', 'is_active_user']
-    list_filter = ['user_type', 'is_active_user', 'is_staff', 'is_superuser', 'clinica']
+    list_display = ['username', 'email', 'first_name', 'last_name', 'filial', 'user_type', 'is_active_user']
+    list_filter = ['user_type', 'is_active_user', 'is_staff', 'is_superuser', 'clinica', 'filial']
     search_fields = ['username', 'email', 'first_name', 'last_name', 'cpf']
     
     fieldsets = BaseUserAdmin.fieldsets + (
-        ('Informações da Clínica', {
-            'fields': ('clinica',)
+        ('Informações da Clínica/Filial', {
+            'fields': ('clinica', 'filial')
         }),
         ('Informações Profissionais', {
             'fields': ('user_type', 'crefito', 'especialidade')
@@ -52,8 +76,8 @@ class UserAdmin(BaseUserAdmin):
     )
     
     add_fieldsets = BaseUserAdmin.add_fieldsets + (
-        ('Informações da Clínica', {
-            'fields': ('clinica',)
+        ('Informações da Clínica/Filial', {
+            'fields': ('clinica', 'filial')
         }),
         ('Informações Profissionais', {
             'fields': ('user_type', 'crefito', 'especialidade', 'email', 'first_name', 'last_name')

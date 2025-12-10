@@ -15,7 +15,12 @@ class Patient(models.Model):
     Pacientes não fazem login no sistema.
     São apenas registros de dados (como uma "ficha").
     Criados e gerenciados por Fisioterapeutas.
-    Pertencem a uma Clínica (Tenant).
+    Pertencem a uma Clínica e Filial (Tenant).
+    
+    BANCO DE PACIENTES CENTRALIZADO:
+    - Paciente pode ser transferido entre fisioterapeutas
+    - Paciente pode ser realocado para outras filiais
+    - Histórico de transferências é mantido
     """
     GENDER_CHOICES = [
         ('M', 'Masculino'),
@@ -31,13 +36,21 @@ class Patient(models.Model):
         verbose_name='Clínica'
     )
     
-    # FISIOTERAPEUTA RESPONSÁVEL - Quem criou e gerencia este paciente
+    # FILIAL - Filial atual do paciente
+    filial = models.ForeignKey(
+        'authentication.Filial',
+        on_delete=models.PROTECT,
+        related_name='pacientes',
+        verbose_name='Filial'
+    )
+    
+    # FISIOTERAPEUTA RESPONSÁVEL - Quem gerencia este paciente atualmente
     fisioterapeuta = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.PROTECT,
         related_name='meus_pacientes',
         verbose_name='Fisioterapeuta Responsável',
-        help_text='Fisioterapeuta que criou e gerencia este paciente'
+        help_text='Fisioterapeuta atualmente responsável por este paciente'
     )
     
     # Dados pessoais
@@ -76,6 +89,13 @@ class Patient(models.Model):
     updated_at = models.DateTimeField(auto_now=True, verbose_name="Atualizado em")
     is_active = models.BooleanField(default=True, verbose_name="Ativo")
     
+    # Disponibilidade para transferência
+    available_for_transfer = models.BooleanField(
+        default=True, 
+        verbose_name="Disponível para Transferência",
+        help_text="Indica se o paciente pode ser realocado para outro fisioterapeuta"
+    )
+    
     # Metadados úteis para mobile
     last_visit = models.DateTimeField(blank=True, null=True, verbose_name="Última Visita")
     notes = models.TextField(blank=True, null=True, verbose_name="Observações Gerais")
@@ -88,7 +108,7 @@ class Patient(models.Model):
         unique_together = [['clinica', 'cpf']]
 
     def __str__(self):
-        return f"{self.full_name} - CPF: {self.cpf} ({self.clinica.nome})"
+        return f"{self.full_name} - {self.filial.nome} ({self.fisioterapeuta.get_full_name()})"
     
     @property
     def age(self):
@@ -98,6 +118,104 @@ class Patient(models.Model):
         return today.year - self.birth_date.year - (
             (today.month, today.day) < (self.birth_date.month, self.birth_date.day)
         )
+    
+    def transfer_to(self, new_fisioterapeuta, reason='', transferred_by=None):
+        """
+        Transfere o paciente para outro fisioterapeuta.
+        Registra o histórico de transferência automaticamente.
+        """
+        from authentication.models import Filial
+        
+        old_fisioterapeuta = self.fisioterapeuta
+        old_filial = self.filial
+        new_filial = new_fisioterapeuta.filial
+        
+        # Atualizar o paciente
+        self.fisioterapeuta = new_fisioterapeuta
+        if new_filial:
+            self.filial = new_filial
+        self.save()
+        
+        # Registrar o histórico
+        PatientTransferHistory.objects.create(
+            patient=self,
+            from_fisioterapeuta=old_fisioterapeuta,
+            from_filial=old_filial,
+            to_fisioterapeuta=new_fisioterapeuta,
+            to_filial=new_filial,
+            reason=reason,
+            transferred_by=transferred_by
+        )
+        
+        return self
+
+
+class PatientTransferHistory(models.Model):
+    """
+    HISTÓRICO DE TRANSFERÊNCIAS DE PACIENTES
+    
+    Mantém rastreabilidade completa de todas as movimentações
+    de pacientes entre fisioterapeutas e filiais.
+    """
+    patient = models.ForeignKey(
+        Patient, 
+        on_delete=models.CASCADE, 
+        related_name='transfer_history',
+        verbose_name="Paciente"
+    )
+    
+    # De onde veio
+    from_fisioterapeuta = models.ForeignKey(
+        settings.AUTH_USER_MODEL, 
+        on_delete=models.SET_NULL, 
+        null=True,
+        related_name='transfers_out',
+        verbose_name="Fisioterapeuta Anterior"
+    )
+    from_filial = models.ForeignKey(
+        'authentication.Filial', 
+        on_delete=models.SET_NULL, 
+        null=True,
+        related_name='transfers_out',
+        verbose_name="Filial Anterior"
+    )
+    
+    # Para onde foi
+    to_fisioterapeuta = models.ForeignKey(
+        settings.AUTH_USER_MODEL, 
+        on_delete=models.SET_NULL, 
+        null=True,
+        related_name='transfers_in',
+        verbose_name="Novo Fisioterapeuta"
+    )
+    to_filial = models.ForeignKey(
+        'authentication.Filial', 
+        on_delete=models.SET_NULL, 
+        null=True,
+        related_name='transfers_in',
+        verbose_name="Nova Filial"
+    )
+    
+    # Metadados da transferência
+    transfer_date = models.DateTimeField(auto_now_add=True, verbose_name="Data da Transferência")
+    reason = models.TextField(blank=True, verbose_name="Motivo da Transferência")
+    transferred_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, 
+        on_delete=models.SET_NULL, 
+        null=True,
+        related_name='transfers_made',
+        verbose_name="Transferido por"
+    )
+    
+    class Meta:
+        ordering = ['-transfer_date']
+        verbose_name = "Histórico de Transferência"
+        verbose_name_plural = "Históricos de Transferências"
+    
+    def __str__(self):
+        from_info = self.from_fisioterapeuta.get_full_name() if self.from_fisioterapeuta else "N/A"
+        to_info = self.to_fisioterapeuta.get_full_name() if self.to_fisioterapeuta else "N/A"
+        return f"{self.patient.full_name}: {from_info} → {to_info} ({self.transfer_date.strftime('%d/%m/%Y')})"
 
 
 class MedicalRecord(models.Model):
@@ -442,4 +560,3 @@ class Discharge(models.Model):
     
     def __str__(self):
         return f"Alta - {self.patient.full_name} ({self.discharge_date.strftime('%d/%m/%Y')}) - {self.get_reason_display()}"
-

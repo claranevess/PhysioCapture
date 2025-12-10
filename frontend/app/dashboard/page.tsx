@@ -37,16 +37,25 @@ export default function Home() {
 
   // Roteamento baseado no papel do usuário
   const renderDashboard = () => {
-    switch (currentUser.user_type) {
-      case 'GESTOR':
-        return <GestorDashboard currentUser={currentUser} />;
-      case 'FISIOTERAPEUTA':
-        return <FisioDashboard currentUser={currentUser} />;
-      case 'ATENDENTE':
-        return <AtendenteDashboard currentUser={currentUser} />;
-      default:
-        return <FisioDashboard currentUser={currentUser} />;
+    const userType = currentUser.user_type;
+
+    // Gestor Geral ou Gestor de Filial usam o GestorDashboard
+    if (userType === 'GESTOR_GERAL' || userType === 'GESTOR_FILIAL' || userType === 'GESTOR') {
+      return <GestorDashboard currentUser={currentUser} />;
     }
+
+    // Fisioterapeuta
+    if (userType === 'FISIOTERAPEUTA') {
+      return <FisioDashboard currentUser={currentUser} />;
+    }
+
+    // Atendente
+    if (userType === 'ATENDENTE') {
+      return <AtendenteDashboard currentUser={currentUser} />;
+    }
+
+    // Fallback
+    return <FisioDashboard currentUser={currentUser} />;
   };
 
   return (

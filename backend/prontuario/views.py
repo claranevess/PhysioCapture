@@ -6,11 +6,12 @@ from django.db.models import Q, Count, F
 from django.db.models.functions import TruncDate, TruncWeek, TruncMonth
 from django.utils import timezone
 from datetime import timedelta, datetime
-from .models import Patient, MedicalRecord, MedicalRecordHistory
+from .models import Patient, MedicalRecord, MedicalRecordHistory, PatientTransferHistory
 from .serializers import (
     PatientSerializer, PatientListSerializer,
     MedicalRecordSerializer, MedicalRecordListSerializer,
-    MedicalRecordCreateUpdateSerializer, MedicalRecordHistorySerializer
+    MedicalRecordCreateUpdateSerializer, MedicalRecordHistorySerializer,
+    PatientTransferSerializer, PatientTransferHistorySerializer
 )
 import json
 
@@ -25,6 +26,9 @@ class PatientViewSet(viewsets.ModelViewSet):
     - PUT/PATCH /api/prontuario/patients/{id}/ - Atualiza um paciente
     - DELETE /api/prontuario/patients/{id}/ - Remove um paciente
     - GET /api/prontuario/patients/{id}/medical_records/ - Prontuários do paciente
+    - POST /api/prontuario/patients/{id}/transfer/ - Transfere paciente para outro fisioterapeuta
+    - GET /api/prontuario/patients/available_for_transfer/ - Pacientes disponíveis para transferência
+    - GET /api/prontuario/patients/{id}/transfer_history/ - Histórico de transferências
     """
     queryset = Patient.objects.all()
     permission_classes = [AllowAny]  # Temporário para desenvolvimento
@@ -38,36 +42,51 @@ class PatientViewSet(viewsets.ModelViewSet):
             return PatientListSerializer
         return PatientSerializer
     
+    def _get_current_user(self):
+        """Helper para obter o usuário atual"""
+        if self.request.user.is_authenticated:
+            return self.request.user
+        
+        user_id = self.request.headers.get('X-User-Id')
+        if user_id:
+            from authentication.models import User
+            try:
+                return User.objects.get(id=int(user_id), is_active_user=True)
+            except (User.DoesNotExist, ValueError):
+                pass
+        
+        # Fallback: primeiro usuário ativo
+        from authentication.models import User
+        return User.objects.filter(is_active_user=True).order_by('id').first()
+    
     def get_queryset(self):
         queryset = super().get_queryset()
+        user = self._get_current_user()
         
-        # Identificar usuário: prioridade para sessão, depois header X-User-Id
-        user = None
-        if self.request.user.is_authenticated:
-            user = self.request.user
-        else:
-            # Tentar pegar do header X-User-Id
-            user_id = self.request.headers.get('X-User-Id')
-            if user_id:
-                from authentication.models import User
-                try:
-                    user = User.objects.get(id=int(user_id), is_active_user=True)
-                except (User.DoesNotExist, ValueError):
-                    pass
+        if not user or not hasattr(user, 'clinica') or not user.clinica:
+            return queryset.none()
         
-        # Fallback: primeiro gestor ativo
-        if not user:
-            from authentication.models import User
-            user = User.objects.filter(user_type='GESTOR', is_active_user=True).order_by('id').first()
+        # Base: filtrar por clínica
+        queryset = queryset.filter(clinica=user.clinica)
         
-        # Filtrar por clínica
-        if user and hasattr(user, 'clinica') and user.clinica:
-            queryset = queryset.filter(clinica=user.clinica)
-            
-            # FISIOTERAPEUTA: ver apenas SEUS pacientes
-            if user.user_type == 'FISIOTERAPEUTA':
-                queryset = queryset.filter(fisioterapeuta=user)
-            # ATENDENTE e GESTOR: ver todos os pacientes da clínica
+        # Filtrar por tipo de usuário
+        if user.is_gestor_geral:
+            # Gestor Geral: ver todos os pacientes da rede
+            pass
+        elif user.is_gestor_filial:
+            # Gestor Filial: ver apenas pacientes da sua filial
+            queryset = queryset.filter(filial=user.filial)
+        elif user.is_fisioterapeuta:
+            # Fisioterapeuta: ver apenas seus pacientes
+            queryset = queryset.filter(fisioterapeuta=user)
+        elif user.is_atendente:
+            # Atendente: ver pacientes da sua filial
+            queryset = queryset.filter(filial=user.filial)
+        
+        # Filtrar por filial (query param)
+        filial_id = self.request.query_params.get('filial', None)
+        if filial_id:
+            queryset = queryset.filter(filial_id=filial_id)
         
         # Filtrar por status ativo
         is_active = self.request.query_params.get('is_active', None)
@@ -77,26 +96,21 @@ class PatientViewSet(viewsets.ModelViewSet):
         return queryset
     
     def perform_create(self, serializer):
-        # RBAC: Associar automaticamente a clínica e fisioterapeuta
-        if self.request.user.is_authenticated:
-            # Se for fisioterapeuta, associar automaticamente como responsável
-            if self.request.user.is_fisioterapeuta:
-                serializer.save(
-                    fisioterapeuta=self.request.user,
-                    clinica=self.request.user.clinica
-                )
-            # Se for gestor, precisa especificar o fisioterapeuta
-            elif self.request.user.is_gestor:
-                # O fisioterapeuta deve ser fornecido no request
-                serializer.save(clinica=self.request.user.clinica)
+        user = self._get_current_user()
+        if user and user.is_fisioterapeuta:
+            serializer.save(
+                fisioterapeuta=user,
+                clinica=user.clinica,
+                filial=user.filial
+            )
+        elif user and user.is_gestor:
+            serializer.save(clinica=user.clinica)
         else:
             serializer.save()
     
     @action(detail=True, methods=['get'])
     def medical_records(self, request, pk=None):
-        """
-        Retorna todos os prontuários de um paciente específico
-        """
+        """Retorna todos os prontuários de um paciente específico"""
         patient = self.get_object()
         records = patient.medical_records.all()
         serializer = MedicalRecordListSerializer(records, many=True)
@@ -104,9 +118,7 @@ class PatientViewSet(viewsets.ModelViewSet):
     
     @action(detail=False, methods=['get'])
     def search(self, request):
-        """
-        Busca avançada de pacientes
-        """
+        """Busca avançada de pacientes"""
         query = request.query_params.get('q', '')
         queryset = self.get_queryset()
         
@@ -125,6 +137,108 @@ class PatientViewSet(viewsets.ModelViewSet):
         
         serializer = PatientListSerializer(queryset, many=True)
         return Response(serializer.data)
+    
+    @action(detail=True, methods=['post'])
+    def transfer(self, request, pk=None):
+        """
+        Transfere um paciente para outro fisioterapeuta
+        POST /api/prontuario/patients/{id}/transfer/
+        
+        Body:
+        {
+            "to_fisioterapeuta_id": 5,
+            "reason": "Paciente mudou de cidade"
+        }
+        """
+        patient = self.get_object()
+        user = self._get_current_user()
+        
+        if not user:
+            return Response(
+                {'error': 'Usuário não identificado'},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+        
+        # Verificar permissão de transferência
+        if not user.can_transfer_patient(patient):
+            return Response(
+                {'error': 'Você não tem permissão para transferir este paciente'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # Validar dados
+        serializer = PatientTransferSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        
+        to_fisio_id = serializer.validated_data['to_fisioterapeuta_id']
+        reason = serializer.validated_data.get('reason', '')
+        
+        # Buscar fisioterapeuta destino
+        from authentication.models import User as AuthUser
+        try:
+            to_fisioterapeuta = AuthUser.objects.get(
+                id=to_fisio_id, 
+                user_type='FISIOTERAPEUTA',
+                is_active_user=True
+            )
+        except AuthUser.DoesNotExist:
+            return Response(
+                {'error': 'Fisioterapeuta de destino não encontrado'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Verificar se é da mesma clínica
+        if to_fisioterapeuta.clinica_id != patient.clinica_id:
+            return Response(
+                {'error': 'Fisioterapeuta de destino deve ser da mesma rede'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Para fisioterapeuta, só pode transferir intra-filial
+        if user.is_fisioterapeuta and to_fisioterapeuta.filial_id != user.filial_id:
+            return Response(
+                {'error': 'Fisioterapeutas só podem transferir pacientes dentro da mesma filial'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # Executar transferência
+        patient.transfer_to(
+            new_fisioterapeuta=to_fisioterapeuta,
+            reason=reason,
+            transferred_by=user
+        )
+        
+        return Response({
+            'message': 'Paciente transferido com sucesso!',
+            'patient': PatientListSerializer(patient).data
+        }, status=status.HTTP_200_OK)
+    
+    @action(detail=False, methods=['get'])
+    def available_for_transfer(self, request):
+        """
+        Lista pacientes disponíveis para transferência
+        GET /api/prontuario/patients/available_for_transfer/
+        """
+        queryset = self.get_queryset().filter(
+            available_for_transfer=True,
+            is_active=True
+        )
+        serializer = PatientListSerializer(queryset, many=True)
+        return Response(serializer.data)
+    
+    @action(detail=True, methods=['get'])
+    def transfer_history(self, request, pk=None):
+        """
+        Retorna o histórico de transferências de um paciente
+        GET /api/prontuario/patients/{id}/transfer_history/
+        """
+        patient = self.get_object()
+        history = patient.transfer_history.all()
+        serializer = PatientTransferHistorySerializer(history, many=True)
+        return Response(serializer.data)
+
+
 
 
 class MedicalRecordViewSet(viewsets.ModelViewSet):
@@ -423,230 +537,242 @@ def dashboard_statistics(request):
 @permission_classes([AllowAny])
 def dashboard_statistics_gestor(request):
     """
-    Endpoint para retornar estatísticas do dashboard do GESTOR
+    Endpoint para dashboard do GESTOR GERAL (Rede Multi-Filial)
     GET /api/prontuario/dashboard-stats/gestor/
     
-    Retorna métricas de toda a clínica:
-    - Total de pacientes da clínica (todos os fisioterapeutas)
-    - Novos pacientes por período
-    - Total de documentos digitalizados
-    - Métricas de atividade por fisioterapeuta
-    
-    🚧 DESENVOLVIMENTO: Autenticação desabilitada temporariamente
+    Retorna:
+    - Métricas globais da rede
+    - Estatísticas por filial (filiaisStats)
+    - Transferências recentes
+    - Fisioterapeutas agrupados por filial
+    - Comparativo entre filiais
     """
-    # TODO: Reabilitar autenticação em produção
-    # if not request.user.is_authenticated:
-    #     return Response({'error': 'Autenticação necessária.'}, status=status.HTTP_401_UNAUTHORIZED)
-    # if not request.user.is_gestor:
-    #     return Response({'error': 'Acesso negado. Apenas gestores.'}, status=status.HTTP_403_FORBIDDEN)
+    from authentication.models import Clinica, Filial, User
+    from documentos.models import Document
+    from .models import PhysioSession, PatientTransferHistory
     
-    # Buscar clínica correta para desenvolvimento (sem autenticação)
-    from authentication.models import Clinica, User
-    try:
-        # Tentar usar usuário autenticado se existir
-        if request.user.is_authenticated and hasattr(request.user, 'clinica'):
-            clinica = request.user.clinica
-        else:
-            # Fallback: usar clínica do último usuário logado (por last_login)
-            last_user = User.objects.filter(
-                is_active_user=True, 
-                clinica__isnull=False
-            ).order_by('-last_login').first()
-            
-            if last_user and last_user.clinica:
-                clinica = last_user.clinica
-            else:
-                # Se não houver, usar primeira clínica
-                clinica = Clinica.objects.first()
-                
-            if not clinica:
-                return Response(
-                    {'error': 'Nenhuma clínica encontrada no sistema'},
-                    status=status.HTTP_404_NOT_FOUND
-                )
-    except Exception as e:
-        return Response(
-            {'error': f'Erro ao buscar clínica: {str(e)}'},
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
+    # Identificar usuário/clínica
+    user = None
+    if request.user.is_authenticated:
+        user = request.user
+    else:
+        user_id = request.headers.get('X-User-Id')
+        if user_id:
+            try:
+                user = User.objects.get(id=int(user_id), is_active_user=True)
+            except (User.DoesNotExist, ValueError):
+                pass
     
+    if not user:
+        user = User.objects.filter(is_active_user=True).order_by('id').first()
+    
+    if not user or not user.clinica:
+        return Response({'error': 'Clínica não encontrada'}, status=status.HTTP_404_NOT_FOUND)
+    
+    clinica = user.clinica
     today = timezone.now().date()
     
-    # Filtrar todos os pacientes da clínica
-    patients_clinica = Patient.objects.filter(clinica=clinica, is_active=True)
+    # ==================== MÉTRICAS GLOBAIS DA REDE ====================
+    all_patients = Patient.objects.filter(clinica=clinica, is_active=True)
+    all_fisios = User.objects.filter(clinica=clinica, user_type='FISIOTERAPEUTA', is_active_user=True)
+    all_filiais = Filial.objects.filter(clinica=clinica, ativa=True)
     
-    # Total de pacientes da clínica
-    total_patients = patients_clinica.count()
+    total_patients = all_patients.count()
+    total_fisioterapeutas = all_fisios.count()
+    total_filiais = all_filiais.count()
     
-    # Novos pacientes este mês
-    new_patients_this_month = patients_clinica.filter(
+    # Novos pacientes (últimos 30 dias)
+    new_patients_month = all_patients.filter(
         created_at__gte=timezone.now() - timedelta(days=30)
     ).count()
     
-    # Pacientes mês passado
-    patients_last_month = patients_clinica.filter(
+    # Crescimento mensal
+    patients_prev_month = all_patients.filter(
         created_at__gte=timezone.now() - timedelta(days=60),
         created_at__lt=timezone.now() - timedelta(days=30)
     ).count()
     
-    # Crescimento mensal de pacientes
-    if patients_last_month > 0:
-        monthly_growth = ((new_patients_this_month - patients_last_month) / patients_last_month) * 100
+    if patients_prev_month > 0:
+        monthly_growth = ((new_patients_month - patients_prev_month) / patients_prev_month) * 100
     else:
-        monthly_growth = 100 if new_patients_this_month > 0 else 0
+        monthly_growth = 100 if new_patients_month > 0 else 0
     
-    # Total de documentos (via relacionamento paciente->documento)
-    from documentos.models import Document
-    total_documents = Document.objects.filter(patient__clinica=clinica).count()
+    # ==================== ESTATÍSTICAS POR FILIAL ====================
+    filiais_stats = []
+    filial_colors = ['#009688', '#2196F3', '#FF9800', '#9C27B0', '#4CAF50', '#F44336']
     
-    # Documentos digitalizados hoje
-    documents_today = Document.objects.filter(
-        patient__clinica=clinica,
-        created_at__date=today
-    ).count()
-    
-    # Fisioterapeutas ativos da clínica
-    from authentication.models import User
-    fisioterapeutas_ativos = User.objects.filter(
-        clinica=clinica,
-        user_type='FISIOTERAPEUTA',
-        is_active_user=True
-    ).count()
-    
-    # Prontuários ativos (últimos 30 dias)
-    active_records = MedicalRecord.objects.filter(
-        patient__clinica=clinica,
-        record_date__gte=timezone.now() - timedelta(days=30)
-    ).count()
-    
-    # Métricas por fisioterapeuta
-    fisioterapeutas = User.objects.filter(
-        clinica=clinica,
-        user_type='FISIOTERAPEUTA',
-        is_active_user=True
-    )
-    
-    fisioterapeutas_metrics = []
-    for fisio in fisioterapeutas:
-        pacientes_count = Patient.objects.filter(fisioterapeuta=fisio, is_active=True).count()
-        consultas_count = MedicalRecord.objects.filter(
-            patient__fisioterapeuta=fisio,
-            record_type='CONSULTA',
-            record_date__gte=timezone.now() - timedelta(days=30)
+    for idx, filial in enumerate(all_filiais):
+        filial_patients = all_patients.filter(filial=filial)
+        filial_fisios = all_fisios.filter(filial=filial)
+        filial_sessions = PhysioSession.objects.filter(
+            clinica=clinica,
+            patient__filial=filial,
+            scheduled_date__gte=today - timedelta(days=30),
+            status='REALIZADA'
         ).count()
-        documentos_count = Document.objects.filter(
-            patient__fisioterapeuta=fisio,
+        filial_docs = Document.objects.filter(
+            patient__filial=filial,
             created_at__gte=timezone.now() - timedelta(days=30)
         ).count()
         
-        fisioterapeutas_metrics.append({
-            'id': fisio.id,
-            'name': fisio.get_full_name() or fisio.username,
-            'pacientes': pacientes_count,
-            'consultas': consultas_count,
-            'documentos': documentos_count
-        })
-    
-    # Dados semanais (semana atual: Seg-Dom) - da clínica
-    from .models import PhysioSession
-    weekly_data = []
-    days_pt = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom']
-    
-    # Calcular a segunda-feira da semana atual
-    days_since_monday = today.weekday()  # 0 = segunda, 6 = domingo
-    monday_of_week = today - timedelta(days=days_since_monday)
-    
-    for i in range(7):  # Seg (0) até Dom (6)
-        day = monday_of_week + timedelta(days=i)
-        day_name = days_pt[i]
-        
-        patients_count = patients_clinica.filter(created_at__date=day).count()
-        
-        # Contar documentos reais (Document), não prontuários
-        documents_count = Document.objects.filter(
-            patient__clinica=clinica,
-            created_at__date=day
+        # Novos pacientes da filial este mês
+        filial_new_patients = filial_patients.filter(
+            created_at__gte=timezone.now() - timedelta(days=30)
         ).count()
         
-        # Contar sessões realizadas neste dia
-        sessions_count = PhysioSession.objects.filter(
-            clinica=clinica,
-            scheduled_date=day,
+        filiais_stats.append({
+            'id': filial.id,
+            'nome': filial.nome,
+            'cidade': filial.cidade,
+            'cor': filial_colors[idx % len(filial_colors)],
+            'totalPacientes': filial_patients.count(),
+            'novosPacientes': filial_new_patients,
+            'fisioterapeutas': filial_fisios.count(),
+            'sessoesRealizadas': filial_sessions,
+            'documentos': filial_docs,
+        })
+    
+    # ==================== TRANSFERÊNCIAS RECENTES ====================
+    transferencias = PatientTransferHistory.objects.filter(
+        patient__clinica=clinica
+    ).select_related(
+        'patient', 'from_fisioterapeuta', 'to_fisioterapeuta', 
+        'from_filial', 'to_filial', 'transferred_by'
+    ).order_by('-transfer_date')[:10]
+    
+    transferencias_recentes = []
+    for t in transferencias:
+        transferencias_recentes.append({
+            'id': t.id,
+            'paciente': t.patient.full_name,
+            'paciente_id': t.patient.id,
+            'de_fisio': t.from_fisioterapeuta.get_full_name() if t.from_fisioterapeuta else 'N/A',
+            'para_fisio': t.to_fisioterapeuta.get_full_name() if t.to_fisioterapeuta else 'N/A',
+            'de_filial': t.from_filial.nome if t.from_filial else 'N/A',
+            'para_filial': t.to_filial.nome if t.to_filial else 'N/A',
+            'data': t.transfer_date.strftime('%d/%m/%Y %H:%M'),
+            'motivo': t.reason or 'Não informado',
+            'autorizado_por': t.transferred_by.get_full_name() if t.transferred_by else 'Sistema',
+            'inter_filial': t.from_filial_id != t.to_filial_id if t.from_filial and t.to_filial else False
+        })
+    
+    total_transferencias_mes = PatientTransferHistory.objects.filter(
+        patient__clinica=clinica,
+        transfer_date__gte=timezone.now() - timedelta(days=30)
+    ).count()
+    
+    # ==================== FISIOTERAPEUTAS POR FILIAL ====================
+    fisioterapeutas_por_filial = []
+    for filial in all_filiais:
+        fisios_filial = all_fisios.filter(filial=filial)
+        fisios_data = []
+        for fisio in fisios_filial:
+            pacientes_count = all_patients.filter(fisioterapeuta=fisio).count()
+            sessoes_count = PhysioSession.objects.filter(
+                fisioterapeuta=fisio,
+                scheduled_date__gte=today - timedelta(days=30),
+                status='REALIZADA'
+            ).count()
+            fisios_data.append({
+                'id': fisio.id,
+                'nome': fisio.get_full_name(),
+                'especialidade': fisio.especialidade or 'Geral',
+                'pacientes': pacientes_count,
+                'sessoes': sessoes_count
+            })
+        
+        fisioterapeutas_por_filial.append({
+            'filial_id': filial.id,
+            'filial_nome': filial.nome,
+            'fisioterapeutas': fisios_data
+        })
+    
+    # ==================== COMPARATIVO MENSAL POR FILIAL ====================
+    comparativo_filiais = []
+    for filial in all_filiais:
+        filial_patients = all_patients.filter(filial=filial)
+        dados_meses = []
+        months_pt = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
+        
+        for i in range(5, -1, -1):
+            month_date = today - timedelta(days=30 * i)
+            month_start = month_date.replace(day=1)
+            if month_date.month == 12:
+                month_end = month_date.replace(year=month_date.year + 1, month=1, day=1) - timedelta(days=1)
+            else:
+                month_end = month_date.replace(month=month_date.month + 1, day=1) - timedelta(days=1)
+            
+            count = filial_patients.filter(
+                created_at__date__gte=month_start,
+                created_at__date__lte=month_end
+            ).count()
+            
+            dados_meses.append({
+                'mes': months_pt[month_date.month - 1],
+                'valor': count
+            })
+        
+        comparativo_filiais.append({
+            'filial': filial.nome,
+            'dados': dados_meses
+        })
+    
+    # ==================== RANKING TOP FISIOTERAPEUTAS ====================
+    ranking_fisios = []
+    for fisio in all_fisios:
+        pacientes = all_patients.filter(fisioterapeuta=fisio).count()
+        sessoes = PhysioSession.objects.filter(
+            fisioterapeuta=fisio,
+            scheduled_date__gte=today - timedelta(days=30),
             status='REALIZADA'
         ).count()
+        score = pacientes * 2 + sessoes  # Pontuação simples
         
-        weekly_data.append({
-            'day': day_name,
-            'pacientes': patients_count,
-            'consultas': sessions_count,
-            'documentos': documents_count
+        ranking_fisios.append({
+            'id': fisio.id,
+            'nome': fisio.get_full_name(),
+            'filial': fisio.filial.nome if fisio.filial else 'N/A',
+            'especialidade': fisio.especialidade or 'Geral',
+            'pacientes': pacientes,
+            'sessoes': sessoes,
+            'score': score
         })
     
-    # Tendência mensal (últimos 8 meses)
-    monthly_trend = []
-    months_pt = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
+    ranking_fisios = sorted(ranking_fisios, key=lambda x: x['score'], reverse=True)[:10]
     
-    for i in range(7, -1, -1):
-        month_date = today - timedelta(days=30 * i)
-        month_start = month_date.replace(day=1)
-        if month_date.month == 12:
-            month_end = month_date.replace(year=month_date.year + 1, month=1, day=1) - timedelta(days=1)
-        else:
-            month_end = month_date.replace(month=month_date.month + 1, day=1) - timedelta(days=1)
-        
-        patients_in_month = patients_clinica.filter(
-            created_at__date__gte=month_start,
-            created_at__date__lte=month_end
-        ).count()
-        
-        monthly_trend.append({
-            'month': months_pt[month_date.month - 1],
-            'value': patients_in_month
-        })
-    
-    # Distribuição de serviços (por tipo de prontuário)
-    service_distribution = []
-    record_types = MedicalRecord.objects.filter(patient__clinica=clinica).values('record_type').annotate(
-        count=Count('id')
-    ).order_by('-count')
-    
-    total_records = MedicalRecord.objects.filter(patient__clinica=clinica).count()
-    
-    if total_records > 0:
-        type_mapping = {
-            'CONSULTA': 'Consultas',
-            'AVALIACAO': 'Avaliações',
-            'EVOLUCAO': 'Evoluções',
-            'PROCEDIMENTO': 'Procedimentos',
-            'EXAME': 'Exames',
-            'DIAGNOSTICO': 'Diagnósticos',
-            'OUTROS': 'Outros'
-        }
-        
-        colors = ['#009688', '#66BB6A', '#FF8099', '#BA68C8', '#FFC107', '#2196F3', '#FF9800']
-        
-        for idx, item in enumerate(record_types[:7]):
-            percentage = (item['count'] / total_records) * 100
-            service_distribution.append({
-                'name': type_mapping.get(item['record_type'], item['record_type']),
-                'value': round(percentage, 1),
-                'color': colors[idx % len(colors)]
-            })
-    # Se não houver prontuários, serviceDistribution permanece vazio (array [])
+    # ==================== PACIENTES DISPONÍVEIS PARA TRANSFERÊNCIA ====================
+    pacientes_disponiveis = all_patients.filter(available_for_transfer=True).count()
     
     return Response({
-        'totalPatients': total_patients,
-        'newPatientsThisMonth': new_patients_this_month,
-        'totalDocuments': total_documents,
-        'documentsToday': documents_today,
-        'fisioterapeutasAtivos': fisioterapeutas_ativos,
-        'activeRecords': active_records,
-        'monthlyGrowth': round(monthly_growth, 1),
-        'weeklyData': weekly_data,
-        'monthlyTrend': monthly_trend,
-        'serviceDistribution': service_distribution,
-        'fisioterapeutasMetrics': fisioterapeutas_metrics
+        # Métricas globais
+        'totalPacientes': total_patients,
+        'totalFisioterapeutas': total_fisioterapeutas,
+        'totalFiliais': total_filiais,
+        'novosPacientesMes': new_patients_month,
+        'crescimentoMensal': round(monthly_growth, 1),
+        'totalTransferenciasMes': total_transferencias_mes,
+        'pacientesDisponiveisTransferencia': pacientes_disponiveis,
+        
+        # Dados por filial
+        'filiaisStats': filiais_stats,
+        
+        # Transferências
+        'transferenciasRecentes': transferencias_recentes,
+        
+        # Fisioterapeutas
+        'fisioterapeutasPorFilial': fisioterapeutas_por_filial,
+        'rankingFisioterapeutas': ranking_fisios,
+        
+        # Comparativo
+        'comparativoFiliais': comparativo_filiais,
+        
+        # Info da rede
+        'rede': {
+            'nome': clinica.nome,
+            'totalFiliais': total_filiais
+        }
     })
+
 
 
 @api_view(['GET'])

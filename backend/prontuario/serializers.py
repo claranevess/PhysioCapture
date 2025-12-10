@@ -1,6 +1,6 @@
 from rest_framework import serializers
-from .models import Patient, MedicalRecord, MedicalRecordHistory
-from django.contrib.auth.models import User
+from .models import Patient, MedicalRecord, MedicalRecordHistory, PatientTransferHistory
+from authentication.models import User
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -12,13 +12,48 @@ class UserSerializer(serializers.ModelSerializer):
         fields = ['id', 'username', 'first_name', 'last_name', 'email']
 
 
+class UserMinimalSerializer(serializers.ModelSerializer):
+    """Serializer mínimo para referências"""
+    full_name = serializers.CharField(source='get_full_name', read_only=True)
+    filial_nome = serializers.CharField(source='filial.nome', read_only=True, allow_null=True)
+    
+    class Meta:
+        model = User
+        fields = ['id', 'full_name', 'filial_nome', 'especialidade']
+
+
+class PatientTransferHistorySerializer(serializers.ModelSerializer):
+    """Serializer para histórico de transferências de pacientes"""
+    from_fisioterapeuta_name = serializers.CharField(source='from_fisioterapeuta.get_full_name', read_only=True, allow_null=True)
+    to_fisioterapeuta_name = serializers.CharField(source='to_fisioterapeuta.get_full_name', read_only=True, allow_null=True)
+    from_filial_name = serializers.CharField(source='from_filial.nome', read_only=True, allow_null=True)
+    to_filial_name = serializers.CharField(source='to_filial.nome', read_only=True, allow_null=True)
+    transferred_by_name = serializers.CharField(source='transferred_by.get_full_name', read_only=True, allow_null=True)
+    
+    class Meta:
+        model = PatientTransferHistory
+        fields = [
+            'id', 'patient',
+            'from_fisioterapeuta', 'from_fisioterapeuta_name',
+            'from_filial', 'from_filial_name',
+            'to_fisioterapeuta', 'to_fisioterapeuta_name',
+            'to_filial', 'to_filial_name',
+            'transfer_date', 'reason',
+            'transferred_by', 'transferred_by_name'
+        ]
+        read_only_fields = fields
+
+
 class PatientSerializer(serializers.ModelSerializer):
     """
-    Serializer para o modelo Patient com foto
+    Serializer para o modelo Patient com foto e informações de filial
     """
     fisioterapeuta_name = serializers.CharField(source='fisioterapeuta.get_full_name', read_only=True)
+    filial_nome = serializers.CharField(source='filial.nome', read_only=True)
+    clinica_nome = serializers.CharField(source='clinica.nome', read_only=True)
     age = serializers.SerializerMethodField()
     photo_url = serializers.SerializerMethodField()
+    transfer_history = PatientTransferHistorySerializer(many=True, read_only=True)
     
     class Meta:
         model = Patient
@@ -27,23 +62,23 @@ class PatientSerializer(serializers.ModelSerializer):
             'phone', 'email', 'address', 'city', 'state', 'zip_code',
             'photo', 'photo_url',
             'chief_complaint', 'blood_type', 'allergies', 'medications', 'medical_history',
-            'created_at', 'updated_at', 'fisioterapeuta', 'fisioterapeuta_name',
-            'is_active', 'age', 'last_visit', 'notes'
+            'created_at', 'updated_at', 
+            'clinica', 'clinica_nome',
+            'filial', 'filial_nome',
+            'fisioterapeuta', 'fisioterapeuta_name',
+            'is_active', 'available_for_transfer', 'age', 'last_visit', 'notes',
+            'transfer_history'
         ]
-        read_only_fields = ['created_at', 'updated_at', 'fisioterapeuta', 'photo_url']
+        read_only_fields = ['created_at', 'updated_at', 'fisioterapeuta', 'photo_url', 'clinica_nome', 'filial_nome', 'transfer_history']
     
     def get_age(self, obj):
-        """
-        Calcula a idade do paciente
-        """
+        """Calcula a idade do paciente"""
         from datetime import date
         today = date.today()
         return today.year - obj.birth_date.year - ((today.month, today.day) < (obj.birth_date.month, obj.birth_date.day))
     
     def get_photo_url(self, obj):
-        """
-        Retorna URL completa da foto
-        """
+        """Retorna URL completa da foto"""
         if obj.photo:
             request = self.context.get('request')
             if request:
@@ -58,10 +93,17 @@ class PatientListSerializer(serializers.ModelSerializer):
     """
     age = serializers.SerializerMethodField()
     photo_url = serializers.SerializerMethodField()
+    fisioterapeuta_name = serializers.CharField(source='fisioterapeuta.get_full_name', read_only=True)
+    filial_nome = serializers.CharField(source='filial.nome', read_only=True)
     
     class Meta:
         model = Patient
-        fields = ['id', 'full_name', 'cpf', 'birth_date', 'age', 'phone', 'photo_url', 'last_visit', 'is_active']
+        fields = [
+            'id', 'full_name', 'cpf', 'birth_date', 'age', 'phone', 
+            'photo_url', 'last_visit', 'is_active', 'available_for_transfer',
+            'filial', 'filial_nome',
+            'fisioterapeuta', 'fisioterapeuta_name'
+        ]
     
     def get_age(self, obj):
         from datetime import date
@@ -75,6 +117,19 @@ class PatientListSerializer(serializers.ModelSerializer):
                 return request.build_absolute_uri(obj.photo.url)
             return obj.photo.url
         return None
+
+
+class PatientTransferSerializer(serializers.Serializer):
+    """Serializer para transferência de paciente"""
+    to_fisioterapeuta_id = serializers.IntegerField(required=True)
+    reason = serializers.CharField(required=False, allow_blank=True, default='')
+    
+    def validate_to_fisioterapeuta_id(self, value):
+        try:
+            fisioterapeuta = User.objects.get(id=value, user_type='FISIOTERAPEUTA')
+        except User.DoesNotExist:
+            raise serializers.ValidationError("Fisioterapeuta não encontrado.")
+        return value
 
 
 class MedicalRecordHistorySerializer(serializers.ModelSerializer):

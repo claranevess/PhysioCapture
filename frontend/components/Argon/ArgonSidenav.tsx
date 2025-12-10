@@ -25,6 +25,7 @@ import {
   Stethoscope,
   Calendar,
   Package,
+  ArrowRightLeft,
 } from 'lucide-react';
 
 interface NavItem {
@@ -33,19 +34,21 @@ interface NavItem {
   icon: any;
   badge?: string;
   children?: NavItem[];
-  onlyFor?: 'GESTOR' | 'FISIOTERAPEUTA' | 'ATENDENTE';
+  onlyFor?: 'GESTOR' | 'GESTOR_GERAL' | 'GESTOR_FILIAL' | 'FISIOTERAPEUTA' | 'ATENDENTE';
+  hideFor?: ('GESTOR_GERAL' | 'GESTOR_FILIAL' | 'FISIOTERAPEUTA' | 'ATENDENTE')[];
 }
 
 const navItems: NavItem[] = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Agenda', href: '/agenda', icon: Calendar },
   {
-    name: 'Pacientes',
+    name: 'Banco de Pacientes',
     href: '/patients',
     icon: Users,
     children: [
-      { name: 'Lista de Pacientes', href: '/patients', icon: Users },
-      { name: 'Novo Paciente', href: '/patients/new', icon: User },
+      { name: 'Ver Todos', href: '/patients', icon: Users },
+      { name: 'Novo Paciente', href: '/patients/new', icon: User, hideFor: ['GESTOR_GERAL'] },
+      { name: 'Transferências', href: '/patients/transferencias', icon: ArrowRightLeft },
     ]
   },
   {
@@ -55,7 +58,7 @@ const navItems: NavItem[] = [
     onlyFor: 'GESTOR'
   },
   { name: 'Documentos', href: '/documents', icon: FolderOpen },
-  { name: 'Digitalizar', href: '/documents/digitize', icon: Camera },
+  { name: 'Digitalizar', href: '/documents/digitize', icon: Camera, hideFor: ['GESTOR_GERAL'] },
   {
     name: 'Estoque',
     href: '/estoque',
@@ -152,7 +155,13 @@ export default function ArgonSidenav() {
           <nav className="flex-1 px-4 py-4 overflow-y-auto">
             <div className="space-y-1">
               {navItems
-                .filter(item => !item.onlyFor || item.onlyFor === currentUser?.user_type)
+                .filter(item => {
+                  // Check onlyFor (exclusive access)
+                  if (item.onlyFor && item.onlyFor !== currentUser?.user_type) return false;
+                  // Check hideFor (hide from specific types)
+                  if (item.hideFor && currentUser?.user_type && item.hideFor.includes(currentUser.user_type as any)) return false;
+                  return true;
+                })
                 .map((item) => (
                   <div key={item.name}>
                     {item.children ? (
@@ -176,21 +185,23 @@ export default function ArgonSidenav() {
                         </button>
                         {expandedItems.includes(item.name) && (
                           <div className="ml-4 mt-1 space-y-1">
-                            {item.children.map((child) => (
-                              <Link
-                                key={child.name}
-                                href={child.href}
-                                onClick={() => setIsOpen(false)}
-                                className="flex items-center gap-3 px-4 py-2 rounded-lg transition-all text-sm"
-                                style={{
-                                  backgroundColor: isActive(child.href) ? argonTheme.colors.light.main : 'transparent',
-                                  color: isActive(child.href) ? argonTheme.colors.primary.main : argonTheme.colors.text.secondary,
-                                }}
-                              >
-                                <child.icon className="w-4 h-4" />
-                                <span className="font-medium">{child.name}</span>
-                              </Link>
-                            ))}
+                            {item.children
+                              .filter((child) => !child.hideFor || !currentUser?.user_type || !child.hideFor.includes(currentUser.user_type as any))
+                              .map((child) => (
+                                <Link
+                                  key={child.name}
+                                  href={child.href}
+                                  onClick={() => setIsOpen(false)}
+                                  className="flex items-center gap-3 px-4 py-2 rounded-lg transition-all text-sm"
+                                  style={{
+                                    backgroundColor: isActive(child.href) ? argonTheme.colors.light.main : 'transparent',
+                                    color: isActive(child.href) ? argonTheme.colors.primary.main : argonTheme.colors.text.secondary,
+                                  }}
+                                >
+                                  <child.icon className="w-4 h-4" />
+                                  <span className="font-medium">{child.name}</span>
+                                </Link>
+                              ))}
                           </div>
                         )}
                       </>
