@@ -22,9 +22,7 @@ import {
   ChevronDown,
   Sparkles,
   User,
-  Stethoscope,
   Calendar,
-  Package,
   ArrowRightLeft,
   UsersRound,
 } from 'lucide-react';
@@ -53,12 +51,6 @@ const navItems: NavItem[] = [
     ]
   },
   {
-    name: 'Fisioterapeutas',
-    href: '/fisioterapeutas',
-    icon: Stethoscope,
-    onlyFor: 'GESTOR'
-  },
-  {
     name: 'Gerenciar Equipe',
     href: '/equipe',
     icon: UsersRound,
@@ -66,12 +58,6 @@ const navItems: NavItem[] = [
   },
   { name: 'Documentos', href: '/documents', icon: FolderOpen },
   { name: 'Digitalizar', href: '/documents/digitize', icon: Camera, hideFor: ['GESTOR_GERAL'] },
-  {
-    name: 'Estoque',
-    href: '/estoque',
-    icon: Package,
-    onlyFor: 'GESTOR'
-  },
 ];
 
 const bottomItems: NavItem[] = [
