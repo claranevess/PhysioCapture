@@ -46,7 +46,7 @@ const navItems: NavItem[] = [
     icon: Users,
     children: [
       { name: 'Ver Todos', href: '/patients', icon: Users },
-      { name: 'Novo Paciente', href: '/patients/new', icon: User, hideFor: ['GESTOR_GERAL'] },
+      { name: 'Novo Paciente', href: '/patients/new', icon: User, onlyFor: 'ATENDENTE' },
       { name: 'Transferências', href: '/patients/transferencias', icon: ArrowRightLeft },
     ]
   },
@@ -188,7 +188,23 @@ export default function ArgonSidenav() {
                         {expandedItems.includes(item.name) && (
                           <div className="ml-4 mt-1 space-y-1">
                             {item.children
-                              .filter((child) => !child.hideFor || !currentUser?.user_type || !child.hideFor.includes(currentUser.user_type as any))
+                              .filter((child) => {
+                                // Check onlyFor (exclusive access)
+                                if (child.onlyFor) {
+                                  if (child.onlyFor === 'GESTOR') {
+                                    if (currentUser?.user_type !== 'GESTOR_GERAL' && currentUser?.user_type !== 'GESTOR_FILIAL') {
+                                      return false;
+                                    }
+                                  } else if (child.onlyFor !== currentUser?.user_type) {
+                                    return false;
+                                  }
+                                }
+                                // Check hideFor (hide from specific types)
+                                if (child.hideFor && currentUser?.user_type && child.hideFor.includes(currentUser.user_type as any)) {
+                                  return false;
+                                }
+                                return true;
+                              })
                               .map((child) => (
                                 <Link
                                   key={child.name}

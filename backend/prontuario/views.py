@@ -96,18 +96,73 @@ class PatientViewSet(viewsets.ModelViewSet):
         
         return queryset
     
+    def create(self, request, *args, **kwargs):
+        """Override create para permitir apenas atendentes criar pacientes"""
+        user = self._get_current_user()
+        
+        if not user:
+            return Response(
+                {'error': 'Usuário não identificado'},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+        
+        # Apenas atendentes podem criar pacientes
+        if not user.is_atendente:
+            return Response(
+                {'error': 'Apenas atendentes podem cadastrar novos pacientes'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        return super().create(request, *args, **kwargs)
+    
     def perform_create(self, serializer):
         user = self._get_current_user()
-        if user and user.is_fisioterapeuta:
+        if user and user.is_atendente:
+            # Atendente: associar à filial dele
+            # Usar fisioterapeuta enviado no request, se houver
+            fisio_id = self.request.data.get('fisioterapeuta')
+            fisioterapeuta = None
+            if fisio_id:
+                from authentication.models import User
+                try:
+                    fisioterapeuta = User.objects.get(id=int(fisio_id), user_type='FISIOTERAPEUTA')
+                except (User.DoesNotExist, ValueError):
+                    pass
+            serializer.save(
+                clinica=user.clinica,
+                filial=user.filial,
+                fisioterapeuta=fisioterapeuta,
+                is_active=True
+            )
+        elif user and user.is_fisioterapeuta:
             serializer.save(
                 fisioterapeuta=user,
                 clinica=user.clinica,
-                filial=user.filial
+                filial=user.filial,
+                is_active=True
             )
         elif user and user.is_gestor:
-            serializer.save(clinica=user.clinica)
+            serializer.save(clinica=user.clinica, is_active=True)
         else:
-            serializer.save()
+            serializer.save(is_active=True)
+    
+    def perform_update(self, serializer):
+        """Override update para permitir atualização do fisioterapeuta"""
+        # Pegar fisioterapeuta do request se enviado
+        fisio_id = self.request.data.get('fisioterapeuta')
+        if fisio_id:
+            from authentication.models import User
+            try:
+                fisioterapeuta = User.objects.get(id=int(fisio_id), user_type='FISIOTERAPEUTA')
+                serializer.save(fisioterapeuta=fisioterapeuta)
+                return
+            except (User.DoesNotExist, ValueError):
+                pass
+        # Se fisioterapeuta for vazio/nulo, permite remover
+        if fisio_id == '' or fisio_id is None:
+            serializer.save(fisioterapeuta=None)
+            return
+        serializer.save()
     
     @action(detail=True, methods=['get'])
     def medical_records(self, request, pk=None):

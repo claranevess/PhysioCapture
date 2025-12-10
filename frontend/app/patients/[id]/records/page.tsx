@@ -29,8 +29,11 @@ import {
   Edit3,
   X,
   Plus,
-  Save
+  Save,
+  Eye,
+  Download
 } from 'lucide-react';
+import DocumentViewerModal from '@/components/UI/DocumentViewerModal';
 
 type TabType = 'resumo' | 'sessoes' | 'documentos' | 'evolucao';
 
@@ -59,6 +62,9 @@ export default function PatientRecordsPage() {
   // Modal state
   const [showEvolutionModal, setShowEvolutionModal] = useState(false);
   const [savingEvolution, setSavingEvolution] = useState(false);
+  
+  // Document viewer state
+  const [viewingDoc, setViewingDoc] = useState<Document | null>(null);
   const [evolutionForm, setEvolutionForm] = useState({
     record_type: 'EVOLUCAO',
     title: '',
@@ -578,21 +584,73 @@ export default function PatientRecordsPage() {
             ) : (
               <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {documents.map((doc) => (
-                  <ArgonCard key={doc.id} hover className="overflow-hidden">
-                    <div className="h-32 flex items-center justify-center" style={{ backgroundColor: argonTheme.colors.grey[50] }}>
+                  <ArgonCard key={doc.id} hover className="overflow-hidden group">
+                    <div 
+                      className="h-32 flex items-center justify-center relative cursor-pointer"
+                      style={{ backgroundColor: argonTheme.colors.grey[50] }}
+                      onClick={() => setViewingDoc(doc)}
+                    >
                       {doc.thumbnail_url ? (
                         <img src={doc.thumbnail_url} alt={doc.title} className="w-full h-full object-contain" />
                       ) : (
                         <FileText className="w-12 h-12" style={{ color: argonTheme.colors.grey[300] }} />
                       )}
+                      {/* Overlay on hover */}
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                        <Eye className="w-8 h-8 text-white" />
+                      </div>
                     </div>
                     <div className="p-4">
                       <h3 className="font-semibold truncate" style={{ color: argonTheme.colors.text.primary }}>
                         {doc.title}
                       </h3>
-                      <p className="text-xs mt-1" style={{ color: argonTheme.colors.text.secondary }}>
-                        {formatDateTime(doc.created_at)}
-                      </p>
+                      <div className="flex items-center justify-between mt-2">
+                        <p className="text-xs" style={{ color: argonTheme.colors.text.secondary }}>
+                          {formatDateTime(doc.created_at)}
+                        </p>
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setViewingDoc(doc);
+                            }}
+                            className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors"
+                            title="Visualizar"
+                          >
+                            <Eye className="w-4 h-4" style={{ color: argonTheme.colors.primary.main }} />
+                          </button>
+                          <button
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              try {
+                                const response = await api.get(`/api/documentos/documents/${doc.id}/download/`, { responseType: 'blob' });
+                                const url = window.URL.createObjectURL(new Blob([response.data]));
+                                const link = document.createElement('a');
+                                link.href = url;
+                                link.setAttribute('download', doc.title + (doc.document_type === 'IMAGE' ? '.jpg' : doc.document_type === 'PDF' ? '.pdf' : ''));
+                                document.body.appendChild(link);
+                                link.click();
+                                link.remove();
+                              } catch (err) {
+                                alert('Erro ao baixar documento');
+                              }
+                            }}
+                            className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors"
+                            title="Download"
+                          >
+                            <Download className="w-4 h-4" style={{ color: argonTheme.colors.success.main }} />
+                          </button>
+                        </div>
+                      </div>
+                      {doc.is_verified && (
+                        <span
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium mt-2"
+                          style={{ backgroundColor: `${argonTheme.colors.success.main}15`, color: argonTheme.colors.success.main }}
+                        >
+                          <CheckCircle className="w-3 h-3" />
+                          Verificado
+                        </span>
+                      )}
                     </div>
                   </ArgonCard>
                 ))}
@@ -600,6 +658,33 @@ export default function PatientRecordsPage() {
             )}
           </div>
         )}
+
+        {/* Document Viewer Modal */}
+        <DocumentViewerModal
+          isOpen={!!viewingDoc}
+          onClose={() => setViewingDoc(null)}
+          doc={viewingDoc ? {
+            id: viewingDoc.id,
+            title: viewingDoc.title,
+            file_url: viewingDoc.file_url || '',
+            document_type: viewingDoc.document_type
+          } : null}
+          onDownload={async () => {
+            if (!viewingDoc) return;
+            try {
+              const response = await api.get(`/api/documentos/documents/${viewingDoc.id}/download/`, { responseType: 'blob' });
+              const url = window.URL.createObjectURL(new Blob([response.data]));
+              const link = document.createElement('a');
+              link.href = url;
+              link.setAttribute('download', viewingDoc.title + (viewingDoc.document_type === 'IMAGE' ? '.jpg' : viewingDoc.document_type === 'PDF' ? '.pdf' : ''));
+              document.body.appendChild(link);
+              link.click();
+              link.remove();
+            } catch (err) {
+              alert('Erro ao baixar documento');
+            }
+          }}
+        />
 
         {activeTab === 'evolucao' && (
           <div className="space-y-4">

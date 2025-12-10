@@ -167,7 +167,7 @@ export default function PatientsPage() {
               {filteredPatients.length} paciente(s) encontrado(s)
             </p>
           </div>
-          {currentUser?.user_type !== 'GESTOR_GERAL' && (
+          {currentUser?.user_type === 'ATENDENTE' && (
             <Link
               href="/patients/new"
               className="px-4 py-2 rounded-lg font-medium text-white transition-all flex items-center gap-2 hover:shadow-lg"

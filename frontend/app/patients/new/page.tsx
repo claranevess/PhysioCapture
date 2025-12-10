@@ -1,9 +1,15 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { api } from '@/lib/api';
+import { api, apiRoutes } from '@/lib/api';
+
+interface Fisioterapeuta {
+  id: number;
+  full_name: string;
+  email: string;
+}
 
 interface PatientFormData {
   full_name: string;
@@ -15,6 +21,7 @@ interface PatientFormData {
   photo?: File | null;
   chief_complaint: string;
   medical_history: string;
+  fisioterapeuta: string;
 }
 
 export default function NewPatientPage() {
@@ -25,6 +32,8 @@ export default function NewPatientPage() {
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [facingMode, setFacingMode] = useState<'user' | 'environment'>('user');
   const [stream, setStream] = useState<MediaStream | null>(null);
+  const [fisioterapeutas, setFisioterapeutas] = useState<Fisioterapeuta[]>([]);
+  const [loadingFisios, setLoadingFisios] = useState(true);
   const videoRef = useRef<HTMLVideoElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -38,10 +47,26 @@ export default function NewPatientPage() {
     photo: null,
     chief_complaint: '',
     medical_history: '',
+    fisioterapeuta: '',
   });
 
+  // Fetch fisioterapeutas on mount
+  useEffect(() => {
+    const fetchFisioterapeutas = async () => {
+      try {
+        const response = await apiRoutes.fisioterapeutas.list();
+        setFisioterapeutas(response.data || []);
+      } catch (err) {
+        console.error('Erro ao carregar fisioterapeutas:', err);
+      } finally {
+        setLoadingFisios(false);
+      }
+    };
+    fetchFisioterapeutas();
+  }, []);
+
   const handleInputChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
   ) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
@@ -196,6 +221,10 @@ export default function NewPatientPage() {
       submitData.append('address', formData.address);
       submitData.append('chief_complaint', formData.chief_complaint);
       submitData.append('medical_history', formData.medical_history);
+      
+      if (formData.fisioterapeuta) {
+        submitData.append('fisioterapeuta', formData.fisioterapeuta);
+      }
 
       if (formData.photo) {
         submitData.append('photo', formData.photo);
@@ -434,6 +463,41 @@ export default function NewPatientPage() {
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 placeholder="Rua, Número, Bairro, Cidade - UF"
               />
+            </div>
+          </div>
+
+          {/* Fisioterapeuta Assignment */}
+          <div className="bg-white rounded-lg shadow-md p-6 space-y-4">
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">
+              👨‍⚕️ Fisioterapeuta Responsável
+            </h2>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Selecione o Fisioterapeuta
+              </label>
+              {loadingFisios ? (
+                <div className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-gray-50 text-gray-500">
+                  Carregando fisioterapeutas...
+                </div>
+              ) : (
+                <select
+                  name="fisioterapeuta"
+                  value={formData.fisioterapeuta}
+                  onChange={handleInputChange}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+                >
+                  <option value="">-- Nenhum (atribuir depois) --</option>
+                  {fisioterapeutas.map((fisio) => (
+                    <option key={fisio.id} value={fisio.id}>
+                      {fisio.full_name}
+                    </option>
+                  ))}
+                </select>
+              )}
+              <p className="mt-1 text-sm text-gray-500">
+                Opcional - O paciente pode ser atribuído a um fisioterapeuta posteriormente
+              </p>
             </div>
           </div>
 

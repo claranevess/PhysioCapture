@@ -15,7 +15,6 @@ import {
   Users,
   FileText,
   Calendar,
-  UserPlus,
   Camera,
   Search,
   Activity,
@@ -337,14 +336,7 @@ export default function FisioDashboard({ currentUser }: FisioDashboardProps) {
         >
           Ações Rápidas
         </h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <ArgonActionCard
-            title="Novo Paciente"
-            description="Cadastrar novo"
-            icon={<UserPlus className="w-6 h-6" />}
-            gradient="primary"
-            href="/patients/new"
-          />
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <ArgonActionCard
             title="Agendar Consulta"
             description="Nova sessão"

@@ -55,6 +55,10 @@ class PatientSerializer(serializers.ModelSerializer):
     photo_url = serializers.SerializerMethodField()
     transfer_history = PatientTransferHistorySerializer(many=True, read_only=True)
     
+    # Campos opcionais na criação (serão definidos pelo backend)
+    clinica = serializers.PrimaryKeyRelatedField(read_only=True)
+    filial = serializers.PrimaryKeyRelatedField(read_only=True)
+    
     class Meta:
         model = Patient
         fields = [
@@ -69,7 +73,7 @@ class PatientSerializer(serializers.ModelSerializer):
             'is_active', 'available_for_transfer', 'age', 'last_visit', 'notes',
             'transfer_history'
         ]
-        read_only_fields = ['created_at', 'updated_at', 'fisioterapeuta', 'photo_url', 'clinica_nome', 'filial_nome', 'transfer_history']
+        read_only_fields = ['created_at', 'updated_at', 'photo_url', 'clinica_nome', 'filial_nome', 'transfer_history']
     
     def get_age(self, obj):
         """Calcula a idade do paciente"""

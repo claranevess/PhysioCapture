@@ -50,14 +50,16 @@ class Patient(models.Model):
         on_delete=models.PROTECT,
         related_name='meus_pacientes',
         verbose_name='Fisioterapeuta Responsável',
-        help_text='Fisioterapeuta atualmente responsável por este paciente'
+        help_text='Fisioterapeuta atualmente responsável por este paciente',
+        null=True,
+        blank=True
     )
     
     # Dados pessoais
     full_name = models.CharField(max_length=200, verbose_name="Nome Completo")
     cpf = models.CharField(max_length=14, verbose_name="CPF")
     birth_date = models.DateField(verbose_name="Data de Nascimento")
-    gender = models.CharField(max_length=1, choices=GENDER_CHOICES, verbose_name="Gênero")
+    gender = models.CharField(max_length=1, choices=GENDER_CHOICES, verbose_name="Gênero", blank=True, default='O')
     
     # Foto do paciente (NOVO - Mobile-first)
     photo = models.ImageField(
@@ -108,7 +110,8 @@ class Patient(models.Model):
         unique_together = [['clinica', 'cpf']]
 
     def __str__(self):
-        return f"{self.full_name} - {self.filial.nome} ({self.fisioterapeuta.get_full_name()})"
+        fisio_name = self.fisioterapeuta.get_full_name() if self.fisioterapeuta else 'Sem fisioterapeuta'
+        return f"{self.full_name} - {self.filial.nome} ({fisio_name})"
     
     @property
     def age(self):
