@@ -378,7 +378,8 @@ def create_fisioterapeuta(request):
     Cria um novo fisioterapeuta na clínica do gestor logado
     POST /api/auth/fisioterapeutas/create/
     """
-    user_id = request.query_params.get('user_id')
+    # Tentar obter user_id do header X-User-Id ou da query param
+    user_id = request.headers.get('X-User-Id') or request.query_params.get('user_id')
     if user_id:
         try:
             simulated_user = User.objects.get(id=int(user_id))
@@ -508,3 +509,176 @@ class UserViewSet(viewsets.ModelViewSet):
             serializer = self.get_serializer(users, many=True)
             return Response(serializer.data)
         return Response({'error': 'Parâmetro "type" é obrigatório'}, status=400)
+
+
+# ==================== ATENDENTES ====================
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def list_atendentes(request):
+    """
+    Lista atendentes da clínica/filial
+    GET /api/auth/atendentes/
+    GET /api/auth/atendentes/?user_id=1
+    GET /api/auth/atendentes/?filial_id=1
+    
+    Filtros baseados no tipo de usuário:
+    - Gestor Geral: todos os atendentes da rede (pode filtrar por filial)
+    - Gestor Filial: apenas atendentes da sua filial
+    """
+    user_id = request.query_params.get('user_id')
+    filial_id = request.query_params.get('filial_id')
+    
+    if user_id:
+        try:
+            simulated_user = User.objects.get(id=int(user_id), is_active_user=True)
+        except (User.DoesNotExist, ValueError):
+            simulated_user = None
+    else:
+        simulated_user = User.objects.filter(is_active_user=True).order_by('id').first()
+    
+    if not simulated_user or not simulated_user.clinica:
+        return Response([], status=status.HTTP_200_OK)
+    
+    # Base queryset: atendentes da mesma clínica
+    queryset = User.objects.filter(
+        clinica=simulated_user.clinica,
+        user_type='ATENDENTE',
+        is_active_user=True
+    )
+    
+    # Filtrar por filial
+    if filial_id:
+        queryset = queryset.filter(filial_id=filial_id)
+    elif simulated_user.is_gestor_filial:
+        # Gestor de filial vê apenas atendentes da sua filial
+        queryset = queryset.filter(filial=simulated_user.filial)
+    # Gestor Geral vê todos (sem filtro adicional)
+    
+    queryset = queryset.order_by('first_name', 'last_name')
+    
+    data = []
+    for atendente in queryset:
+        data.append({
+            'id': atendente.id,
+            'username': atendente.username,
+            'first_name': atendente.first_name,
+            'last_name': atendente.last_name,
+            'full_name': atendente.get_full_name(),
+            'email': atendente.email,
+            'phone': atendente.phone,
+            'is_active_user': atendente.is_active_user,
+            'filial_id': atendente.filial_id,
+            'filial_nome': atendente.filial.nome if atendente.filial else None,
+        })
+    
+    return Response(data, status=status.HTTP_200_OK)
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def create_atendente(request):
+    """
+    Cria um novo atendente na clínica do gestor logado
+    POST /api/auth/atendentes/create/
+    """
+    # Tentar obter user_id do header X-User-Id ou da query param
+    user_id = request.headers.get('X-User-Id') or request.query_params.get('user_id')
+    if user_id:
+        try:
+            simulated_user = User.objects.get(id=int(user_id))
+        except User.DoesNotExist:
+            simulated_user = User.objects.filter(user_type__in=['GESTOR_GERAL', 'GESTOR_FILIAL'], is_active_user=True).order_by('id').first()
+    else:
+        simulated_user = User.objects.filter(user_type__in=['GESTOR_GERAL', 'GESTOR_FILIAL'], is_active_user=True).order_by('id').first()
+    
+    if not simulated_user or not simulated_user.is_gestor:
+        return Response(
+            {'error': 'Apenas gestores podem cadastrar atendentes.'},
+            status=status.HTTP_403_FORBIDDEN
+        )
+    
+    if not simulated_user.clinica:
+        return Response(
+            {'error': 'Gestor não está associado a uma clínica.'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    # Validar dados obrigatórios
+    required_fields = ['username', 'email', 'password', 'first_name', 'last_name']
+    for field in required_fields:
+        if not request.data.get(field):
+            return Response(
+                {'error': f'Campo obrigatório: {field}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+    
+    # Verificar se username já existe
+    if User.objects.filter(username=request.data['username']).exists():
+        return Response(
+            {'error': 'Nome de usuário já existe.'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    # Verificar se email já existe
+    if User.objects.filter(email=request.data['email']).exists():
+        return Response(
+            {'error': 'Email já está em uso.'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    # Determinar filial
+    filial_id = request.data.get('filial_id')
+    if filial_id:
+        try:
+            filial = Filial.objects.get(id=filial_id, clinica=simulated_user.clinica)
+        except Filial.DoesNotExist:
+            return Response(
+                {'error': 'Filial não encontrada.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+    elif simulated_user.is_gestor_filial:
+        # Gestor de filial cria na sua própria filial
+        filial = simulated_user.filial
+    else:
+        return Response(
+            {'error': 'Filial é obrigatória.'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    try:
+        atendente = User.objects.create(
+            username=request.data['username'],
+            email=request.data['email'],
+            first_name=request.data['first_name'],
+            last_name=request.data['last_name'],
+            cpf=request.data.get('cpf', ''),
+            phone=request.data.get('phone', ''),
+            clinica=simulated_user.clinica,
+            filial=filial,
+            user_type='ATENDENTE',
+            is_active=True,
+            is_active_user=True,
+        )
+        
+        atendente.set_password(request.data['password'])
+        atendente.save()
+        
+        return Response({
+            'message': 'Atendente cadastrado com sucesso!',
+            'atendente': {
+                'id': atendente.id,
+                'username': atendente.username,
+                'email': atendente.email,
+                'first_name': atendente.first_name,
+                'last_name': atendente.last_name,
+                'filial_id': atendente.filial_id,
+                'filial_nome': atendente.filial.nome if atendente.filial else None,
+            }
+        }, status=status.HTTP_201_CREATED)
+        
+    except Exception as e:
+        return Response(
+            {'error': f'Erro ao criar atendente: {str(e)}'},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )

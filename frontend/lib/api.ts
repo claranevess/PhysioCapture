@@ -50,6 +50,7 @@ export const apiRoutes = {
   statistics: {
     dashboard: () => api.get('/api/prontuario/dashboard-stats/'),
     gestor: () => api.get('/api/prontuario/dashboard-stats/gestor/'),
+    gestorFilial: () => api.get('/api/prontuario/dashboard-stats/gestor-filial/'),
     fisioterapeuta: () => api.get('/api/prontuario/dashboard-stats/fisioterapeuta/'),
   },
   auth: {
@@ -84,6 +85,13 @@ export const apiRoutes = {
     forTransfer: (patientId: number) => api.get('/api/auth/fisioterapeutas/transfer/', {
       params: { patient_id: patientId }
     }),
+    create: (data: any) => api.post('/api/auth/fisioterapeutas/create/', data),
+  },
+  atendentes: {
+    list: (filialId?: number) => api.get('/api/auth/atendentes/', {
+      params: filialId ? { filial_id: filialId } : {}
+    }),
+    create: (data: any) => api.post('/api/auth/atendentes/create/', data),
   },
   medicalRecords: {
     list: (params?: any) => api.get('/api/prontuario/medical-records/', { params }),
@@ -112,5 +120,18 @@ export const apiRoutes = {
     create: (data: any) => api.post('/api/documentos/categories/', data),
     update: (id: number, data: any) => api.patch(`/api/documentos/categories/${id}/`, data),
     delete: (id: number) => api.delete(`/api/documentos/categories/${id}/`),
+  },
+  transferRequests: {
+    list: (status?: string) => api.get('/api/prontuario/transfer-requests/', {
+      params: status ? { status } : {}
+    }),
+    create: (data: { patient_id: number; to_fisioterapeuta_id: number; reason: string }) =>
+      api.post('/api/prontuario/transfer-requests/create/', data),
+    approve: (id: number, note?: string) =>
+      api.post(`/api/prontuario/transfer-requests/${id}/approve/`, { note }),
+    reject: (id: number, note: string) =>
+      api.post(`/api/prontuario/transfer-requests/${id}/reject/`, { note }),
+    cancel: (id: number) =>
+      api.post(`/api/prontuario/transfer-requests/${id}/cancel/`),
   },
 };

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import ArgonLayout from "@/components/Argon/ArgonLayout";
 import GestorDashboard from "./gestor-dashboard";
+import GestorFilialDashboard from "./gestor-filial-dashboard";
 import FisioDashboard from "./fisio-dashboard";
 import AtendenteDashboard from "./atendente-dashboard";
 
@@ -39,9 +40,14 @@ export default function Home() {
   const renderDashboard = () => {
     const userType = currentUser.user_type;
 
-    // Gestor Geral ou Gestor de Filial usam o GestorDashboard
-    if (userType === 'GESTOR_GERAL' || userType === 'GESTOR_FILIAL' || userType === 'GESTOR') {
+    // Gestor Geral - visão de rede
+    if (userType === 'GESTOR_GERAL' || userType === 'GESTOR') {
       return <GestorDashboard currentUser={currentUser} />;
+    }
+
+    // Gestor de Filial - visão da filial
+    if (userType === 'GESTOR_FILIAL') {
+      return <GestorFilialDashboard currentUser={currentUser} />;
     }
 
     // Fisioterapeuta

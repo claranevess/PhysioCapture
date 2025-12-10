@@ -218,6 +218,148 @@ class PatientTransferHistory(models.Model):
         return f"{self.patient.full_name}: {from_info} → {to_info} ({self.transfer_date.strftime('%d/%m/%Y')})"
 
 
+class TransferRequest(models.Model):
+    """
+    SOLICITAÇÃO DE TRANSFERÊNCIA DE PACIENTE
+    
+    Fisioterapeutas podem solicitar transferência de seus pacientes
+    para outros fisioterapeutas (mesma filial ou outra filial).
+    Gestores de filial devem aprovar/rejeitar as solicitações.
+    """
+    STATUS_CHOICES = [
+        ('PENDENTE', 'Pendente'),
+        ('APROVADA', 'Aprovada'),
+        ('REJEITADA', 'Rejeitada'),
+        ('CANCELADA', 'Cancelada'),
+    ]
+    
+    # Paciente a ser transferido
+    patient = models.ForeignKey(
+        Patient,
+        on_delete=models.CASCADE,
+        related_name='transfer_requests',
+        verbose_name='Paciente'
+    )
+    
+    # Fisioterapeuta solicitante (dono atual do paciente)
+    requested_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='transfer_requests_made',
+        verbose_name='Solicitado por'
+    )
+    
+    # Filial de origem
+    from_filial = models.ForeignKey(
+        'authentication.Filial',
+        on_delete=models.CASCADE,
+        related_name='transfer_requests_out',
+        verbose_name='Filial de Origem'
+    )
+    
+    # Fisioterapeuta de destino
+    to_fisioterapeuta = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='transfer_requests_received',
+        verbose_name='Fisioterapeuta de Destino'
+    )
+    
+    # Filial de destino
+    to_filial = models.ForeignKey(
+        'authentication.Filial',
+        on_delete=models.CASCADE,
+        related_name='transfer_requests_in',
+        verbose_name='Filial de Destino'
+    )
+    
+    # Motivo da solicitação
+    reason = models.TextField(
+        verbose_name='Motivo da Transferência',
+        help_text='Explique o motivo da solicitação de transferência'
+    )
+    
+    # Status da solicitação
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default='PENDENTE',
+        verbose_name='Status'
+    )
+    
+    # Resposta do gestor (quando aprovada/rejeitada)
+    response_note = models.TextField(
+        blank=True,
+        null=True,
+        verbose_name='Observação do Gestor'
+    )
+    
+    # Quem aprovou/rejeitou
+    reviewed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='transfer_requests_reviewed',
+        verbose_name='Analisado por'
+    )
+    
+    # Datas de controle
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='Criado em')
+    updated_at = models.DateTimeField(auto_now=True, verbose_name='Atualizado em')
+    reviewed_at = models.DateTimeField(null=True, blank=True, verbose_name='Analisado em')
+    
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = 'Solicitação de Transferência'
+        verbose_name_plural = 'Solicitações de Transferência'
+    
+    def __str__(self):
+        return f"Solicitação: {self.patient.full_name} → {self.to_fisioterapeuta.get_full_name()} ({self.get_status_display()})"
+    
+    @property
+    def is_inter_filial(self):
+        """Verifica se é uma transferência entre filiais"""
+        return self.from_filial_id != self.to_filial_id
+    
+    def approve(self, reviewer, note=''):
+        """Aprova a solicitação e executa a transferência"""
+        from django.utils import timezone
+        
+        self.status = 'APROVADA'
+        self.reviewed_by = reviewer
+        self.reviewed_at = timezone.now()
+        self.response_note = note
+        self.save()
+        
+        # Executar a transferência
+        self.patient.transfer_to(
+            new_fisioterapeuta=self.to_fisioterapeuta,
+            reason=self.reason,
+            transferred_by=reviewer
+        )
+        
+        return self
+    
+    def reject(self, reviewer, note=''):
+        """Rejeita a solicitação"""
+        from django.utils import timezone
+        
+        self.status = 'REJEITADA'
+        self.reviewed_by = reviewer
+        self.reviewed_at = timezone.now()
+        self.response_note = note
+        self.save()
+        
+        return self
+    
+    def cancel(self):
+        """Cancela a solicitação (pelo próprio fisioterapeuta)"""
+        self.status = 'CANCELADA'
+        self.save()
+        return self
+
+
 class MedicalRecord(models.Model):
     """
     Modelo para prontuários médicos dos pacientes

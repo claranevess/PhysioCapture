@@ -26,6 +26,7 @@ import {
   Calendar,
   Package,
   ArrowRightLeft,
+  UsersRound,
 } from 'lucide-react';
 
 interface NavItem {
@@ -56,6 +57,12 @@ const navItems: NavItem[] = [
     href: '/fisioterapeutas',
     icon: Stethoscope,
     onlyFor: 'GESTOR'
+  },
+  {
+    name: 'Gerenciar Equipe',
+    href: '/equipe',
+    icon: UsersRound,
+    onlyFor: 'GESTOR_FILIAL'
   },
   { name: 'Documentos', href: '/documents', icon: FolderOpen },
   { name: 'Digitalizar', href: '/documents/digitize', icon: Camera, hideFor: ['GESTOR_GERAL'] },

@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Patient, MedicalRecord, MedicalRecordHistory, PatientTransferHistory
+from .models import Patient, MedicalRecord, MedicalRecordHistory, PatientTransferHistory, TransferRequest
 from authentication.models import User
 
 
@@ -201,3 +201,55 @@ class MedicalRecordCreateUpdateSerializer(serializers.ModelSerializer):
             'history', 'physical_exam', 'diagnosis', 'treatment_plan',
             'observations', 'record_date'
         ]
+
+
+class TransferRequestSerializer(serializers.ModelSerializer):
+    """Serializer para solicitações de transferência"""
+    patient_name = serializers.CharField(source='patient.full_name', read_only=True)
+    requested_by_name = serializers.CharField(source='requested_by.get_full_name', read_only=True)
+    from_filial_name = serializers.CharField(source='from_filial.nome', read_only=True)
+    to_fisioterapeuta_name = serializers.CharField(source='to_fisioterapeuta.get_full_name', read_only=True)
+    to_filial_name = serializers.CharField(source='to_filial.nome', read_only=True)
+    reviewed_by_name = serializers.CharField(source='reviewed_by.get_full_name', read_only=True, allow_null=True)
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
+    is_inter_filial = serializers.BooleanField(read_only=True)
+    
+    class Meta:
+        model = TransferRequest
+        fields = [
+            'id', 'patient', 'patient_name',
+            'requested_by', 'requested_by_name',
+            'from_filial', 'from_filial_name',
+            'to_fisioterapeuta', 'to_fisioterapeuta_name',
+            'to_filial', 'to_filial_name',
+            'reason', 'status', 'status_display',
+            'response_note', 'reviewed_by', 'reviewed_by_name',
+            'created_at', 'updated_at', 'reviewed_at',
+            'is_inter_filial'
+        ]
+        read_only_fields = [
+            'id', 'requested_by', 'from_filial', 'status',
+            'response_note', 'reviewed_by', 'reviewed_at',
+            'created_at', 'updated_at'
+        ]
+
+
+class TransferRequestCreateSerializer(serializers.Serializer):
+    """Serializer para criar solicitações de transferência"""
+    patient_id = serializers.IntegerField(required=True)
+    to_fisioterapeuta_id = serializers.IntegerField(required=True)
+    reason = serializers.CharField(required=True)
+    
+    def validate_patient_id(self, value):
+        try:
+            patient = Patient.objects.get(id=value)
+        except Patient.DoesNotExist:
+            raise serializers.ValidationError("Paciente não encontrado.")
+        return value
+    
+    def validate_to_fisioterapeuta_id(self, value):
+        try:
+            fisioterapeuta = User.objects.get(id=value, user_type='FISIOTERAPEUTA')
+        except User.DoesNotExist:
+            raise serializers.ValidationError("Fisioterapeuta não encontrado.")
+        return value

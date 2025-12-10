@@ -6,12 +6,13 @@ from django.db.models import Q, Count, F
 from django.db.models.functions import TruncDate, TruncWeek, TruncMonth
 from django.utils import timezone
 from datetime import timedelta, datetime
-from .models import Patient, MedicalRecord, MedicalRecordHistory, PatientTransferHistory
+from .models import Patient, MedicalRecord, MedicalRecordHistory, PatientTransferHistory, TransferRequest
 from .serializers import (
     PatientSerializer, PatientListSerializer,
     MedicalRecordSerializer, MedicalRecordListSerializer,
     MedicalRecordCreateUpdateSerializer, MedicalRecordHistorySerializer,
-    PatientTransferSerializer, PatientTransferHistorySerializer
+    PatientTransferSerializer, PatientTransferHistorySerializer,
+    TransferRequestSerializer, TransferRequestCreateSerializer
 )
 import json
 
@@ -777,6 +778,238 @@ def dashboard_statistics_gestor(request):
 
 @api_view(['GET'])
 @permission_classes([AllowAny])
+def dashboard_statistics_gestor_filial(request):
+    """
+    Endpoint para dashboard do GESTOR DE FILIAL
+    GET /api/prontuario/dashboard-stats/gestor-filial/
+    
+    Retorna estatísticas específicas da filial do gestor:
+    - Métricas da filial
+    - Fisioterapeutas da equipe com métricas
+    - Transferências pendentes/recentes DA FILIAL
+    - Ranking de performance da equipe
+    """
+    from authentication.models import Clinica, Filial, User
+    from documentos.models import Document
+    from .models import PhysioSession, PatientTransferHistory
+    
+    today = timezone.now().date()
+    
+    # Obter usuário (gestor de filial)
+    user_id = request.query_params.get('user_id') or request.headers.get('X-User-Id')
+    if user_id:
+        try:
+            current_user = User.objects.get(id=int(user_id), is_active_user=True)
+        except (User.DoesNotExist, ValueError):
+            current_user = None
+    else:
+        current_user = User.objects.filter(is_active_user=True, user_type='GESTOR_FILIAL').first()
+    
+    if not current_user or not current_user.clinica or not current_user.filial:
+        return Response({'error': 'Gestor de filial não encontrado ou sem filial associada'}, status=400)
+    
+    clinica = current_user.clinica
+    filial = current_user.filial
+    
+    # ==================== MÉTRICAS DA FILIAL ====================
+    filial_patients = Patient.objects.filter(clinica=clinica, filial=filial, is_active=True)
+    filial_fisios = User.objects.filter(clinica=clinica, filial=filial, user_type='FISIOTERAPEUTA', is_active_user=True)
+    filial_atendentes = User.objects.filter(clinica=clinica, filial=filial, user_type='ATENDENTE', is_active_user=True)
+    
+    total_pacientes = filial_patients.count()
+    total_fisioterapeutas = filial_fisios.count()
+    total_atendentes = filial_atendentes.count()
+    
+    # Novos pacientes (últimos 30 dias)
+    novos_pacientes_mes = filial_patients.filter(
+        created_at__gte=timezone.now() - timedelta(days=30)
+    ).count()
+    
+    # Sessões realizadas no mês
+    sessoes_mes = PhysioSession.objects.filter(
+        fisioterapeuta__filial=filial,
+        scheduled_date__gte=today - timedelta(days=30),
+        status='REALIZADA'
+    ).count()
+    
+    # Sessões agendadas para hoje
+    sessoes_hoje = PhysioSession.objects.filter(
+        fisioterapeuta__filial=filial,
+        scheduled_date=today
+    ).count()
+    
+    # Documentos da filial
+    total_documentos = Document.objects.filter(
+        patient__filial=filial
+    ).count()
+    
+    # ==================== FISIOTERAPEUTAS DA EQUIPE ====================
+    equipe_fisios = []
+    for fisio in filial_fisios:
+        pacientes_fisio = filial_patients.filter(fisioterapeuta=fisio).count()
+        sessoes_fisio = PhysioSession.objects.filter(
+            fisioterapeuta=fisio,
+            scheduled_date__gte=today - timedelta(days=30),
+            status='REALIZADA'
+        ).count()
+        
+        equipe_fisios.append({
+            'id': fisio.id,
+            'nome': fisio.get_full_name(),
+            'email': fisio.email,
+            'phone': fisio.phone,
+            'especialidade': fisio.especialidade or 'Geral',
+            'crefito': fisio.crefito,
+            'pacientes': pacientes_fisio,
+            'sessoes_mes': sessoes_fisio
+        })
+    
+    # Ordenar por sessões (maior primeiro)
+    equipe_fisios = sorted(equipe_fisios, key=lambda x: x['sessoes_mes'], reverse=True)
+    
+    # ==================== ATENDENTES DA EQUIPE ====================
+    equipe_atendentes = []
+    for atendente in filial_atendentes:
+        equipe_atendentes.append({
+            'id': atendente.id,
+            'nome': atendente.get_full_name(),
+            'email': atendente.email,
+            'phone': atendente.phone
+        })
+    
+    # ==================== TRANSFERÊNCIAS DA FILIAL ====================
+    # Regras de visibilidade:
+    # 1. Transferências INTERNAS (mesma filial origem e destino): só visível para essa filial
+    # 2. Transferências INTER-FILIAIS (filiais diferentes): visível para ambas as filiais
+    
+    # Transferências internas da filial (from_filial == to_filial == filial atual)
+    transferencias_internas = PatientTransferHistory.objects.filter(
+        from_filial=filial,
+        to_filial=filial,
+        transfer_date__gte=timezone.now() - timedelta(days=30)
+    )
+    
+    # Transferências inter-filiais que envolvem esta filial (origem OU destino, mas não ambos)
+    transferencias_inter_filiais = PatientTransferHistory.objects.filter(
+        Q(from_filial=filial) | Q(to_filial=filial),
+        transfer_date__gte=timezone.now() - timedelta(days=30)
+    ).exclude(
+        from_filial=F('to_filial')  # Excluir transferências internas (já incluídas acima se forem da mesma filial)
+    )
+    
+    # Combinar e ordenar
+    from itertools import chain
+    transferencias_combinadas = list(chain(transferencias_internas, transferencias_inter_filiais))
+    transferencias_combinadas = sorted(transferencias_combinadas, key=lambda x: x.transfer_date, reverse=True)[:10]
+    
+    transferencias_recentes = []
+    for t in transferencias_combinadas:
+        is_inter_filial = t.from_filial_id != t.to_filial_id if t.from_filial and t.to_filial else False
+        transferencias_recentes.append({
+            'id': t.id,
+            'paciente': t.patient.full_name,
+            'paciente_id': t.patient.id,
+            'de_fisio': t.from_fisioterapeuta.get_full_name() if t.from_fisioterapeuta else 'N/A',
+            'para_fisio': t.to_fisioterapeuta.get_full_name() if t.to_fisioterapeuta else 'N/A',
+            'de_filial': t.from_filial.nome if t.from_filial else 'N/A',
+            'para_filial': t.to_filial.nome if t.to_filial else 'N/A',
+            'data': t.transfer_date.strftime('%d/%m/%Y %H:%M'),
+            'motivo': t.reason or 'Não informado',
+            'tipo': 'entrada' if t.to_filial == filial else 'saida',
+            'inter_filial': is_inter_filial
+        })
+    
+    # Contagem total: internas + inter-filiais que envolvem esta filial
+    total_transferencias_internas = PatientTransferHistory.objects.filter(
+        from_filial=filial,
+        to_filial=filial,
+        transfer_date__gte=timezone.now() - timedelta(days=30)
+    ).count()
+    
+    total_transferencias_inter = PatientTransferHistory.objects.filter(
+        Q(from_filial=filial) | Q(to_filial=filial),
+        transfer_date__gte=timezone.now() - timedelta(days=30)
+    ).exclude(
+        from_filial=F('to_filial')
+    ).count()
+    
+    total_transferencias_mes = total_transferencias_internas + total_transferencias_inter
+    
+    # ==================== TOP PACIENTES (mais sessões) ====================
+    top_pacientes = []
+    for paciente in filial_patients[:5]:
+        sessoes_paciente = PhysioSession.objects.filter(
+            patient=paciente,
+            scheduled_date__gte=today - timedelta(days=30)
+        ).count()
+        top_pacientes.append({
+            'id': paciente.id,
+            'nome': paciente.full_name,
+            'fisioterapeuta': paciente.fisioterapeuta.get_full_name() if paciente.fisioterapeuta else 'N/A',
+            'sessoes': sessoes_paciente
+        })
+    
+    # ==================== DISTRIBUIÇÃO HORÁRIA ====================
+    # Sessões por período do dia
+    sessoes_manha = PhysioSession.objects.filter(
+        fisioterapeuta__filial=filial,
+        scheduled_date__gte=today - timedelta(days=7),
+        scheduled_time__lt='12:00:00'
+    ).count()
+    
+    sessoes_tarde = PhysioSession.objects.filter(
+        fisioterapeuta__filial=filial,
+        scheduled_date__gte=today - timedelta(days=7),
+        scheduled_time__gte='12:00:00',
+        scheduled_time__lt='18:00:00'
+    ).count()
+    
+    sessoes_noite = PhysioSession.objects.filter(
+        fisioterapeuta__filial=filial,
+        scheduled_date__gte=today - timedelta(days=7),
+        scheduled_time__gte='18:00:00'
+    ).count()
+    
+    return Response({
+        # Info da filial
+        'filial': {
+            'id': filial.id,
+            'nome': filial.nome,
+            'cidade': filial.cidade
+        },
+        
+        # Métricas da filial
+        'totalPacientes': total_pacientes,
+        'totalFisioterapeutas': total_fisioterapeutas,
+        'totalAtendentes': total_atendentes,
+        'novosPacientesMes': novos_pacientes_mes,
+        'sessoesMes': sessoes_mes,
+        'sessoesHoje': sessoes_hoje,
+        'totalDocumentos': total_documentos,
+        'totalTransferenciasMes': total_transferencias_mes,
+        
+        # Equipe
+        'equipeFisioterapeutas': equipe_fisios,
+        'equipeAtendentes': equipe_atendentes,
+        
+        # Transferências
+        'transferenciasRecentes': transferencias_recentes,
+        
+        # Pacientes em destaque
+        'topPacientes': top_pacientes,
+        
+        # Distribuição de sessões
+        'distribuicaoSessoes': {
+            'manha': sessoes_manha,
+            'tarde': sessoes_tarde,
+            'noite': sessoes_noite
+        }
+    })
+
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
 def dashboard_statistics_fisioterapeuta(request):
     """
     Endpoint para retornar estatísticas do dashboard do FISIOTERAPEUTA
@@ -1326,3 +1559,313 @@ class DischargeViewSet(viewsets.ModelViewSet):
                 serializer.save(clinica=user.clinica)
         else:
             serializer.save()
+
+
+# ==========================================
+# SOLICITAÇÕES DE TRANSFERÊNCIA
+# ==========================================
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def list_transfer_requests(request):
+    """
+    Lista solicitações de transferência
+    - Fisioterapeuta: vê apenas as suas solicitações
+    - Gestor de Filial: vê solicitações que envolvem sua filial
+    - Gestor Geral: vê todas as solicitações da clínica
+    """
+    from authentication.models import User
+    
+    user_id = request.headers.get('X-User-Id') or request.query_params.get('user_id')
+    status_filter = request.query_params.get('status', None)
+    
+    if not user_id:
+        return Response({'error': 'Usuário não identificado'}, status=status.HTTP_400_BAD_REQUEST)
+    
+    try:
+        user = User.objects.get(id=user_id)
+    except User.DoesNotExist:
+        return Response({'error': 'Usuário não encontrado'}, status=status.HTTP_404_NOT_FOUND)
+    
+    # Base queryset
+    queryset = TransferRequest.objects.select_related(
+        'patient', 'requested_by', 'from_filial',
+        'to_fisioterapeuta', 'to_filial', 'reviewed_by'
+    )
+    
+    # Filtrar por clínica
+    if user.clinica:
+        queryset = queryset.filter(patient__clinica=user.clinica)
+    
+    # Filtrar por papel do usuário
+    if user.user_type == 'FISIOTERAPEUTA':
+        # Fisioterapeuta vê apenas suas próprias solicitações
+        queryset = queryset.filter(requested_by=user)
+    elif user.user_type == 'GESTOR_FILIAL':
+        # Gestor de filial vê solicitações que envolvem sua filial
+        if user.filial:
+            queryset = queryset.filter(
+                Q(from_filial=user.filial) | Q(to_filial=user.filial)
+            )
+    # GESTOR_GERAL vê todas da clínica (já filtrado acima)
+    
+    # Filtrar por status
+    if status_filter:
+        queryset = queryset.filter(status=status_filter.upper())
+    
+    # Ordenar por data de criação (mais recentes primeiro)
+    queryset = queryset.order_by('-created_at')
+    
+    serializer = TransferRequestSerializer(queryset, many=True)
+    return Response(serializer.data)
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def create_transfer_request(request):
+    """
+    Cria uma solicitação de transferência de paciente
+    Apenas Fisioterapeutas podem criar solicitações para seus próprios pacientes
+    """
+    from authentication.models import User
+    
+    user_id = request.headers.get('X-User-Id') or request.query_params.get('user_id')
+    
+    if not user_id:
+        return Response({'error': 'Usuário não identificado'}, status=status.HTTP_400_BAD_REQUEST)
+    
+    try:
+        user = User.objects.get(id=user_id)
+    except User.DoesNotExist:
+        return Response({'error': 'Usuário não encontrado'}, status=status.HTTP_404_NOT_FOUND)
+    
+    # Apenas fisioterapeutas podem criar solicitações
+    if user.user_type != 'FISIOTERAPEUTA':
+        return Response(
+            {'error': 'Apenas fisioterapeutas podem criar solicitações de transferência'},
+            status=status.HTTP_403_FORBIDDEN
+        )
+    
+    serializer = TransferRequestCreateSerializer(data=request.data)
+    if not serializer.is_valid():
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    patient_id = serializer.validated_data['patient_id']
+    to_fisioterapeuta_id = serializer.validated_data['to_fisioterapeuta_id']
+    reason = serializer.validated_data['reason']
+    
+    # Buscar paciente
+    try:
+        patient = Patient.objects.get(id=patient_id)
+    except Patient.DoesNotExist:
+        return Response({'error': 'Paciente não encontrado'}, status=status.HTTP_404_NOT_FOUND)
+    
+    # Verificar se o paciente pertence ao fisioterapeuta
+    if patient.fisioterapeuta != user:
+        return Response(
+            {'error': 'Você só pode solicitar transferência de seus próprios pacientes'},
+            status=status.HTTP_403_FORBIDDEN
+        )
+    
+    # Buscar fisioterapeuta de destino
+    try:
+        to_fisio = User.objects.get(id=to_fisioterapeuta_id, user_type='FISIOTERAPEUTA')
+    except User.DoesNotExist:
+        return Response({'error': 'Fisioterapeuta de destino não encontrado'}, status=status.HTTP_404_NOT_FOUND)
+    
+    # Não pode transferir para si mesmo
+    if to_fisio == user:
+        return Response(
+            {'error': 'Não é possível transferir para você mesmo'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    # Verificar se já existe uma solicitação pendente para este paciente
+    existing = TransferRequest.objects.filter(
+        patient=patient,
+        status='PENDENTE'
+    ).exists()
+    
+    if existing:
+        return Response(
+            {'error': 'Já existe uma solicitação pendente para este paciente'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    # Criar a solicitação
+    transfer_request = TransferRequest.objects.create(
+        patient=patient,
+        requested_by=user,
+        from_filial=user.filial,
+        to_fisioterapeuta=to_fisio,
+        to_filial=to_fisio.filial,
+        reason=reason
+    )
+    
+    response_serializer = TransferRequestSerializer(transfer_request)
+    return Response(response_serializer.data, status=status.HTTP_201_CREATED)
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def approve_transfer_request(request, pk):
+    """
+    Aprova uma solicitação de transferência
+    Apenas Gestores podem aprovar
+    """
+    from authentication.models import User
+    
+    user_id = request.headers.get('X-User-Id') or request.query_params.get('user_id')
+    
+    if not user_id:
+        return Response({'error': 'Usuário não identificado'}, status=status.HTTP_400_BAD_REQUEST)
+    
+    try:
+        user = User.objects.get(id=user_id)
+    except User.DoesNotExist:
+        return Response({'error': 'Usuário não encontrado'}, status=status.HTTP_404_NOT_FOUND)
+    
+    # Apenas gestores podem aprovar
+    if user.user_type not in ['GESTOR_FILIAL', 'GESTOR_GERAL']:
+        return Response(
+            {'error': 'Apenas gestores podem aprovar solicitações'},
+            status=status.HTTP_403_FORBIDDEN
+        )
+    
+    try:
+        transfer_request = TransferRequest.objects.get(id=pk)
+    except TransferRequest.DoesNotExist:
+        return Response({'error': 'Solicitação não encontrada'}, status=status.HTTP_404_NOT_FOUND)
+    
+    # Verificar se já foi processada
+    if transfer_request.status != 'PENDENTE':
+        return Response(
+            {'error': f'Esta solicitação já foi {transfer_request.get_status_display().lower()}'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    # Gestor de filial só pode aprovar solicitações que envolvem sua filial
+    if user.user_type == 'GESTOR_FILIAL':
+        if user.filial not in [transfer_request.from_filial, transfer_request.to_filial]:
+            return Response(
+                {'error': 'Você não tem permissão para aprovar esta solicitação'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+    
+    note = request.data.get('note', '')
+    transfer_request.approve(reviewer=user, note=note)
+    
+    serializer = TransferRequestSerializer(transfer_request)
+    return Response({
+        'message': 'Solicitação aprovada com sucesso! Paciente transferido.',
+        'data': serializer.data
+    })
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def reject_transfer_request(request, pk):
+    """
+    Rejeita uma solicitação de transferência
+    Apenas Gestores podem rejeitar
+    """
+    from authentication.models import User
+    
+    user_id = request.headers.get('X-User-Id') or request.query_params.get('user_id')
+    
+    if not user_id:
+        return Response({'error': 'Usuário não identificado'}, status=status.HTTP_400_BAD_REQUEST)
+    
+    try:
+        user = User.objects.get(id=user_id)
+    except User.DoesNotExist:
+        return Response({'error': 'Usuário não encontrado'}, status=status.HTTP_404_NOT_FOUND)
+    
+    # Apenas gestores podem rejeitar
+    if user.user_type not in ['GESTOR_FILIAL', 'GESTOR_GERAL']:
+        return Response(
+            {'error': 'Apenas gestores podem rejeitar solicitações'},
+            status=status.HTTP_403_FORBIDDEN
+        )
+    
+    try:
+        transfer_request = TransferRequest.objects.get(id=pk)
+    except TransferRequest.DoesNotExist:
+        return Response({'error': 'Solicitação não encontrada'}, status=status.HTTP_404_NOT_FOUND)
+    
+    # Verificar se já foi processada
+    if transfer_request.status != 'PENDENTE':
+        return Response(
+            {'error': f'Esta solicitação já foi {transfer_request.get_status_display().lower()}'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    # Gestor de filial só pode rejeitar solicitações que envolvem sua filial
+    if user.user_type == 'GESTOR_FILIAL':
+        if user.filial not in [transfer_request.from_filial, transfer_request.to_filial]:
+            return Response(
+                {'error': 'Você não tem permissão para rejeitar esta solicitação'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+    
+    note = request.data.get('note', '')
+    if not note:
+        return Response(
+            {'error': 'É necessário informar o motivo da rejeição'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    transfer_request.reject(reviewer=user, note=note)
+    
+    serializer = TransferRequestSerializer(transfer_request)
+    return Response({
+        'message': 'Solicitação rejeitada.',
+        'data': serializer.data
+    })
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def cancel_transfer_request(request, pk):
+    """
+    Cancela uma solicitação de transferência
+    Apenas o fisioterapeuta que criou pode cancelar
+    """
+    from authentication.models import User
+    
+    user_id = request.headers.get('X-User-Id') or request.query_params.get('user_id')
+    
+    if not user_id:
+        return Response({'error': 'Usuário não identificado'}, status=status.HTTP_400_BAD_REQUEST)
+    
+    try:
+        user = User.objects.get(id=user_id)
+    except User.DoesNotExist:
+        return Response({'error': 'Usuário não encontrado'}, status=status.HTTP_404_NOT_FOUND)
+    
+    try:
+        transfer_request = TransferRequest.objects.get(id=pk)
+    except TransferRequest.DoesNotExist:
+        return Response({'error': 'Solicitação não encontrada'}, status=status.HTTP_404_NOT_FOUND)
+    
+    # Apenas o criador pode cancelar
+    if transfer_request.requested_by != user:
+        return Response(
+            {'error': 'Você só pode cancelar suas próprias solicitações'},
+            status=status.HTTP_403_FORBIDDEN
+        )
+    
+    # Verificar se já foi processada
+    if transfer_request.status != 'PENDENTE':
+        return Response(
+            {'error': f'Esta solicitação já foi {transfer_request.get_status_display().lower()}'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    transfer_request.cancel()
+    
+    serializer = TransferRequestSerializer(transfer_request)
+    return Response({
+        'message': 'Solicitação cancelada.',
+        'data': serializer.data
+    })
