@@ -343,20 +343,7 @@ O dashboard é **personalizado** de acordo com o tipo de usuário:
 
 ---
 
-### 6. 📦 Gestão de Estoque
-
-**Caminho:** `/estoque`
-
-#### Funcionalidades:
-- **Listagem de produtos**
-- **Controle de quantidade**
-- **Alertas de estoque baixo**
-- **Movimentações** (entrada/saída)
-- **Histórico de movimentações**
-
----
-
-### 7. 🔄 Transferência de Pacientes
+### 6. 🔄 Transferência de Pacientes
 
 **Caminho:** Disponível no dashboard do atendente e prontuário
 
@@ -368,7 +355,7 @@ O dashboard é **personalizado** de acordo com o tipo de usuário:
 
 ---
 
-### 8. 👤 Perfil do Usuário
+### 7. 👤 Perfil do Usuário
 
 **Caminho:** `/profile`
 
@@ -380,7 +367,7 @@ O dashboard é **personalizado** de acordo com o tipo de usuário:
 
 ---
 
-### 9. 🏢 Gestão de Filiais
+### 8. 🏢 Gestão de Filiais
 
 **Caminho:** `/filiais` (Gestor Geral)
 
@@ -391,7 +378,7 @@ O dashboard é **personalizado** de acordo com o tipo de usuário:
 
 ---
 
-### 10. 👨‍⚕️ Gestão de Equipe
+### 9. 👨‍⚕️ Gestão de Equipe
 
 **Caminho:** `/equipe` ou `/fisioterapeutas`
 
